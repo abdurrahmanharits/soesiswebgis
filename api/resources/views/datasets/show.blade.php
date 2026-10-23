@@ -29,6 +29,10 @@
             <div id="detail-badges" class="flex shrink-0 items-center gap-2"></div>
         </div>
 
+        <div id="detail-notice" class="mt-6 empty:hidden"></div>
+
+        @include('datasets.partials.preview')
+
         <div id="detail-body" class="mt-6 space-y-6"></div>
     </div>
 </main>

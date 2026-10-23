@@ -23,6 +23,8 @@ services:
       - serve
       - "--host=0.0.0.0"
       - "--port=8000"
+      # Required for PHP_CLI_SERVER_WORKERS (.env) to take effect.
+      - "--no-reload"
 
     depends_on:
       db:

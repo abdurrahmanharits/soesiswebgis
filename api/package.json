@@ -15,5 +15,9 @@
     },
     "optionalDependencies": {
         "@laravel/multiplex": "^0.4.1"
+    },
+    "dependencies": {
+        "ol": "^10.11.0",
+        "proj4": "^2.22.0"
     }
 }

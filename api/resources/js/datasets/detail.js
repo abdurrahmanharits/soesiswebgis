@@ -148,16 +148,57 @@ function render(d) {
     $('detail-title').textContent = datasetTitle(d);
     $('detail-subtitle').textContent = d.original_filename ?? '';
     $('detail-badges').innerHTML = `${formatBadge(d.format)} ${statusBadge(d.status)}`;
+    $('detail-notice').innerHTML = statusNotice(d);
     $('detail-body').innerHTML = `
-        ${statusNotice(d)}
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">${common}${specific}</div>
         ${rawMetadata(d.metadata)}`;
 
     document.title = `${datasetTitle(d)} · SoESIS WebGIS`;
 }
 
+const PREVIEW_MESSAGES = {
+    queued: 'Dataset is queued for processing. Spatial preview will be available when processing is complete.',
+    processing: 'Dataset is being processed. Spatial preview will load automatically when the dataset is ready.',
+    failed: 'Spatial preview unavailable because dataset processing failed.',
+};
+
+/**
+ * Shows the map section for ready datasets and lazy-loads OpenLayers once;
+ * later polls never rebuild the map.
+ */
+function createPreviewController() {
+    let started = false;
+
+    return function sync(d) {
+        const previewable = ['shapefile', 'geotiff'].includes(d.format);
+
+        $('preview-section').hidden = !previewable;
+        if (!previewable || started) return;
+
+        const ready = d.status === 'ready_for_curation';
+        const message = $('preview-message');
+
+        message.hidden = ready;
+        message.textContent = PREVIEW_MESSAGES[d.status] ?? '';
+        $('preview-body').hidden = !ready;
+        $('preview-basemaps').hidden = !ready;
+
+        if (!ready) return;
+
+        started = true;
+
+        import('../map/index.js')
+            .then((m) => m.initDatasetPreview(d))
+            .catch(() => {
+                $('preview-loading').hidden = true;
+                $('preview-error').hidden = false;
+            });
+    };
+}
+
 export function initDatasetDetail(root) {
     const id = root.dataset.datasetId;
+    const syncPreview = createPreviewController();
     let current = null;
 
     const poller = createStatusPoller({
@@ -169,6 +210,7 @@ export function initDatasetDetail(root) {
 
             current = dataset;
             render(dataset);
+            syncPreview(dataset);
         },
     });
 
@@ -181,6 +223,7 @@ export function initDatasetDetail(root) {
             current = await getDataset(id);
             render(current);
             $('detail-content').hidden = false;
+            syncPreview(current);
 
             if (isPending(current)) poller.track(id);
         } catch (error) {

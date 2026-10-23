@@ -36,6 +36,19 @@ RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
         'default_socket_timeout=900' \
         > "$PHP_INI_DIR/conf.d/soesis.ini"
 
+# File access through the Windows bind mount is slow (~10 ms per stat),
+# so avoid re-checking every PHP file on every request.
+# Code changes are picked up within revalidate_freq seconds.
+RUN printf '%s\n' \
+        'opcache.enable=1' \
+        'opcache.validate_timestamps=1' \
+        'opcache.revalidate_freq=60' \
+        'opcache.memory_consumption=192' \
+        'opcache.max_accelerated_files=20000' \
+        'realpath_cache_size=16M' \
+        'realpath_cache_ttl=3600' \
+        > "$PHP_INI_DIR/conf.d/soesis-performance.ini"
+
 # Create a non-root application user.
 RUN useradd \
         --create-home \

@@ -46,6 +46,18 @@ export async function getDataset(id) {
     return body?.data ?? null;
 }
 
+/** GeoJSON FeatureCollection (EPSG:4326) with `bbox` and `preview` {limit, total, truncated}. */
+export function getVectorPreview(id) {
+    return getJson(`/api/datasets/${encodeURIComponent(id)}/preview/vector`);
+}
+
+/** COG url, CRS (srid + proj4), WGS84 extent, nodata and approximate band statistics. */
+export async function getRasterInfo(id) {
+    const body = await getJson(`/api/datasets/${encodeURIComponent(id)}/preview/raster/info`);
+
+    return body?.data ?? null;
+}
+
 /**
  * Upload with XMLHttpRequest because fetch() has no upload progress events.
  * Returns { promise, abort }.
