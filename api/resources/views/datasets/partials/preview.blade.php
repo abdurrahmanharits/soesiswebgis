@@ -1,7 +1,7 @@
 {{-- Static so the map survives detail.js re-rendering on each status poll. --}}
 <section id="preview-section" class="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white" aria-labelledby="preview-heading" hidden>
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
-        <h2 id="preview-heading" class="text-sm font-semibold text-slate-900">Spatial preview</h2>
+        <h2 id="preview-heading" class="text-sm font-semibold text-slate-900">Preview</h2>
         <div id="preview-basemaps" class="inline-flex rounded-md ring-1 ring-slate-300 ring-inset" role="group" aria-label="Basemap" hidden>
             <button type="button" data-basemap="osm" aria-pressed="true"
                     class="rounded-l-md px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 aria-pressed:bg-slate-900 aria-pressed:text-white">Map</button>
@@ -20,12 +20,12 @@
             <div id="preview-loading" class="absolute inset-0 grid place-items-center bg-white/60 text-sm text-slate-700" aria-live="polite">
                 <span class="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
                     <span class="size-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" aria-hidden="true"></span>
-                    Loading spatial preview…
+                    Loading preview…
                 </span>
             </div>
 
             <div id="preview-error" class="absolute inset-x-4 top-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm" role="alert" hidden>
-                <p class="font-semibold">Spatial preview could not be loaded.</p>
+                <p class="font-semibold">Preview could not be loaded.</p>
                 <p data-message class="mt-0.5"></p>
             </div>
 

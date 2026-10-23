@@ -67,7 +67,7 @@ export async function initDatasetPreview(dataset) {
     function showError(message) {
         ui.loading.hidden = true;
         ui.error.hidden = false;
-        ui.error.querySelector('[data-message]').textContent = message || 'Spatial preview could not be loaded.';
+        ui.error.querySelector('[data-message]').textContent = message || 'Preview could not be loaded.';
     }
 
     ui.loading.hidden = false;
@@ -107,7 +107,7 @@ export async function initDatasetPreview(dataset) {
         // COG tiles arrive through several Range requests; surface a failed source.
         result.source.on('change', () => {
             if (result.source.getState() === 'error') {
-                showError(`Spatial preview could not be loaded. ${result.source.getError()?.message ?? ''}`.trim());
+                showError(`Preview could not be loaded. ${result.source.getError()?.message ?? ''}`.trim());
             }
         });
     }

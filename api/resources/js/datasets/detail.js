@@ -157,9 +157,9 @@ function render(d) {
 }
 
 const PREVIEW_MESSAGES = {
-    queued: 'Dataset is queued for processing. Spatial preview will be available when processing is complete.',
-    processing: 'Dataset is being processed. Spatial preview will load automatically when the dataset is ready.',
-    failed: 'Spatial preview unavailable because dataset processing failed.',
+    queued: 'Dataset is queued for processing. Preview will be available when processing is complete.',
+    processing: 'Dataset is being processed. Preview will load automatically when the dataset is ready.',
+    failed: 'Preview unavailable because dataset processing failed.',
 };
 
 /**
