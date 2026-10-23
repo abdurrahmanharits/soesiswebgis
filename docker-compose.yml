@@ -1,0 +1,85 @@
+name: soesis_poc
+
+services:
+  app:
+    build:
+      context: ./docker/php
+
+    image: soesis-poc-php:local
+    init: true
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    volumes:
+      - ./api:/var/www/html
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    command:
+      - php
+      - artisan
+      - serve
+      - "--host=0.0.0.0"
+      - "--port=8000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  db:
+    image: postgis/postgis:15-3.4
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: soesis
+      POSTGRES_USER: soesis
+      POSTGRES_PASSWORD: "soesis_dev_2026"
+
+    ports:
+      - "127.0.0.1:5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "soesis", "-d", "soesis"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory-policy"
+      - "noeviction"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  postgres_data:
+  redis_data:

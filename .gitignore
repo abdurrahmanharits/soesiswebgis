@@ -1,0 +1,8 @@
+# Large spatial sample files (GitHub rejects files > 100 MB)
+/sample_data/
+
+# Local editor / OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

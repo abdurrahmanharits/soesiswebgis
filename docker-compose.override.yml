@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+
+    image: soesis-poc-php:local
+
+    init: true
+
+    working_dir: /var/www/html
+
+    volumes:
+      - ./api:/var/www/html
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://127.0.0.1:8000/up
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: soesis-poc-php:local
+
+    init: true
+
+    working_dir: /var/www/html
+
+    volumes:
+      - ./api:/var/www/html
+
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=spatial
+      - --timeout=900
+      - --tries=2
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

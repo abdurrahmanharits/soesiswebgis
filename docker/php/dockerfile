@@ -1,0 +1,52 @@
+FROM php:8.4-cli-trixie
+
+# Install system packages, GDAL, and PHP build dependencies.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        unzip \
+        gdal-bin \
+        libpq-dev \
+        libzip-dev \
+        libicu-dev \
+    && docker-php-ext-install -j"$(nproc)" \
+        pdo_pgsql \
+        pcntl \
+        zip \
+        intl \
+        bcmath \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Composer from the official Composer image.
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# PHP configuration for the SoESIS PoC.
+# Limits are set high enough for large GeoTIFF uploads.
+RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini" \
+    && printf '%s\n' \
+        'memory_limit=512M' \
+        'upload_max_filesize=512M' \
+        'post_max_size=520M' \
+        'max_execution_time=900' \
+        'max_input_time=900' \
+        'default_socket_timeout=900' \
+        > "$PHP_INI_DIR/conf.d/soesis.ini"
+
+# Create a non-root application user.
+RUN useradd \
+        --create-home \
+        --uid 1000 \
+        --shell /bin/bash \
+        appuser \
+    && mkdir -p /var/www/html \
+    && chown -R appuser:appuser /var/www/html
+
+ENV COMPOSER_HOME=/home/appuser/.composer
+
+WORKDIR /var/www/html
+
+USER appuser
