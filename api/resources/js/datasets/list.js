@@ -5,8 +5,9 @@ import {
     formatBadge,
     formatDate,
     isPending,
+    lifecycleBadge,
+    lifecycleKey,
     orDash,
-    statusBadge,
     summaryDetail,
 } from './format.js';
 import { createStatusPoller } from './poller.js';
@@ -38,8 +39,9 @@ export function initDatasetList() {
         retry: $('dataset-retry'),
         summary: {
             total: $('summary-total'),
-            ready: $('summary-ready'),
             processing: $('summary-processing'),
+            pending: $('summary-pending'),
+            approved: $('summary-approved'),
             failed: $('summary-failed'),
         },
     };
@@ -85,7 +87,7 @@ export function initDatasetList() {
 
         return state.datasets.filter((d) => {
             if (state.format && d.format !== state.format) return false;
-            if (state.status && d.status !== state.status) return false;
+            if (state.status && lifecycleKey(d) !== state.status) return false;
             if (!term) return true;
 
             return [d.title, d.original_filename].some((value) => value?.toLowerCase().includes(term));
@@ -96,8 +98,9 @@ export function initDatasetList() {
         const count = (predicate) => state.datasets.filter(predicate).length;
 
         el.summary.total.textContent = state.datasets.length;
-        el.summary.ready.textContent = count((d) => d.status === 'ready_for_curation');
         el.summary.processing.textContent = count(isPending);
+        el.summary.pending.textContent = count((d) => lifecycleKey(d) === 'pending');
+        el.summary.approved.textContent = count((d) => lifecycleKey(d) === 'approved');
         el.summary.failed.textContent = count((d) => d.status === 'failed');
     }
 
@@ -115,7 +118,7 @@ export function initDatasetList() {
             <td class="px-4 py-3">${formatBadge(d.format)}</td>
             <td class="px-4 py-3 font-mono text-xs text-slate-700">${orDash(d.crs)}</td>
             <td class="px-4 py-3 text-xs leading-5 text-slate-600">${summaryDetail(d)}</td>
-            <td class="px-4 py-3">${statusBadge(d.status)}${failure}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${lifecycleBadge(d)}${failure}</td>
             <td class="px-4 py-3 text-xs whitespace-nowrap text-slate-600">${formatDate(d.created_at)}</td>
             <td class="px-4 py-3 text-right">
                 <a href="${url}" class="inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium text-emerald-700 ring-1 ring-slate-200 ring-inset hover:bg-emerald-50">View</a>

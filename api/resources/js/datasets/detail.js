@@ -7,9 +7,12 @@ import {
     formatDate,
     formatNumber,
     isPending,
+    LIFECYCLE,
+    lifecycleBadge,
     orDash,
     statusBadge,
 } from './format.js';
+import { createCurationPanel } from './curation.js';
 import { createStatusPoller } from './poller.js';
 import { showToast } from '../ui/toast.js';
 
@@ -115,7 +118,8 @@ function render(d) {
         row('Title', orDash(d.title)),
         row('Original filename', orDash(d.original_filename), { mono: true }),
         row('Format', formatBadge(d.format)),
-        row('Status', statusBadge(d.status)),
+        row('Processing status', statusBadge(d.status)),
+        row('Review status', d.status === 'ready_for_curation' ? statusBadge(d.curation_status, LIFECYCLE) : DASH),
         row('CRS', orDash(d.crs), { mono: true }),
         row('SRID', orDash(d.srid), { mono: true }),
         row('Created at', formatDate(d.created_at)),
@@ -147,7 +151,7 @@ function render(d) {
 
     $('detail-title').textContent = datasetTitle(d);
     $('detail-subtitle').textContent = d.original_filename ?? '';
-    $('detail-badges').innerHTML = `${formatBadge(d.format)} ${statusBadge(d.status)}`;
+    $('detail-badges').innerHTML = `${formatBadge(d.format)} ${lifecycleBadge(d)}`;
     $('detail-notice').innerHTML = statusNotice(d);
     $('detail-body').innerHTML = `
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">${common}${specific}</div>
@@ -201,6 +205,24 @@ export function initDatasetDetail(root) {
     const syncPreview = createPreviewController();
     let current = null;
 
+    function apply(dataset) {
+        current = dataset;
+        render(dataset);
+        syncPreview(dataset);
+        curation.sync(dataset);
+    }
+
+    const curation = createCurationPanel({
+        // null = state changed elsewhere (409); reload the current record.
+        onChange(dataset) {
+            if (dataset) {
+                apply(dataset);
+            } else {
+                getDataset(id).then(apply).catch(() => {});
+            }
+        },
+    });
+
     const poller = createStatusPoller({
         onUpdate(dataset) {
             if (current && current.status !== dataset.status) {
@@ -208,9 +230,7 @@ export function initDatasetDetail(root) {
                 if (dataset.status === 'failed') showToast('Processing failed.', 'error');
             }
 
-            current = dataset;
-            render(dataset);
-            syncPreview(dataset);
+            apply(dataset);
         },
     });
 
@@ -220,10 +240,9 @@ export function initDatasetDetail(root) {
         $('detail-content').hidden = true;
 
         try {
-            current = await getDataset(id);
-            render(current);
+            const dataset = await getDataset(id);
             $('detail-content').hidden = false;
-            syncPreview(current);
+            apply(dataset);
 
             if (isPending(current)) poller.track(id);
         } catch (error) {

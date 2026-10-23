@@ -33,6 +33,8 @@
 
         @include('datasets.partials.preview')
 
+        @include('datasets.partials.curation')
+
         <div id="detail-body" class="mt-6 space-y-6"></div>
     </div>
 </main>

@@ -26,6 +26,67 @@ export const STATUS = {
     },
 };
 
+/**
+ * One status per dataset for list badges/filters: ingestion state until the
+ * dataset is ready, then its curation state.
+ */
+export const LIFECYCLE = {
+    queued: STATUS.queued,
+    processing: STATUS.processing,
+    failed: STATUS.failed,
+    pending: {
+        label: 'Pending review',
+        className: 'bg-amber-50 text-amber-800 ring-amber-200',
+        dot: 'bg-amber-500',
+    },
+    approved: {
+        label: 'Approved',
+        className: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+        dot: 'bg-emerald-500',
+    },
+    rejected: {
+        label: 'Rejected',
+        className: 'bg-orange-50 text-orange-800 ring-orange-200',
+        dot: 'bg-orange-500',
+    },
+};
+
+export function lifecycleKey(dataset) {
+    return dataset.status === 'ready_for_curation' ? (dataset.curation_status || 'pending') : dataset.status;
+}
+
+/** ISO 19115 MD_TopicCategoryCode → label. Keys mirror DatasetCurationController::TOPIC_CATEGORIES. */
+export const TOPIC_CATEGORIES = {
+    biota: 'Biota',
+    boundaries: 'Boundaries',
+    climatologyMeteorologyAtmosphere: 'Climatology / meteorology / atmosphere',
+    economy: 'Economy',
+    elevation: 'Elevation',
+    environment: 'Environment',
+    farming: 'Farming',
+    geoscientificInformation: 'Geoscientific information',
+    health: 'Health',
+    imageryBaseMapsEarthCover: 'Imagery / base maps / earth cover',
+    inlandWaters: 'Inland waters',
+    intelligenceMilitary: 'Intelligence / military',
+    location: 'Location',
+    oceans: 'Oceans',
+    planningCadastre: 'Planning / cadastre',
+    society: 'Society',
+    structure: 'Structure',
+    transportation: 'Transportation',
+    utilitiesCommunication: 'Utilities / communication',
+};
+
+/** Keys mirror DatasetCurationController::LICENSES. */
+export const LICENSES = {
+    'CC-BY-4.0': 'CC BY 4.0',
+    'CC-BY-SA-4.0': 'CC BY-SA 4.0',
+    'CC0-1.0': 'CC0 1.0',
+    restricted: 'Restricted / internal',
+    other: 'Other',
+};
+
 export const FORMAT = {
     shapefile: { label: 'Shapefile', className: 'bg-violet-50 text-violet-800 ring-violet-200' },
     geotiff: { label: 'GeoTIFF', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
@@ -50,12 +111,16 @@ export function orDash(value) {
     return value === null || value === undefined || value === '' ? DASH : escapeHtml(value);
 }
 
-export function statusBadge(status) {
-    const s = STATUS[status] ?? { label: status || 'Unknown', className: 'bg-slate-100 text-slate-700 ring-slate-300', dot: 'bg-slate-400' };
+export function statusBadge(status, map = STATUS) {
+    const s = map[status] ?? { label: status || 'Unknown', className: 'bg-slate-100 text-slate-700 ring-slate-300', dot: 'bg-slate-400' };
 
     return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${s.className}">
         <span class="size-1.5 rounded-full ${s.dot}" aria-hidden="true"></span>${escapeHtml(s.label)}
     </span>`;
+}
+
+export function lifecycleBadge(dataset) {
+    return statusBadge(lifecycleKey(dataset), LIFECYCLE);
 }
 
 export function formatBadge(format) {

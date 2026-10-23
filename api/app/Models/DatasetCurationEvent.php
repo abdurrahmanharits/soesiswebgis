@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class DatasetCurationEvent extends Model
+{
+    public const UPDATED_AT = null;
+
+    protected $fillable = [
+        'dataset_id',
+        'action',
+        'reviewer_name',
+        'note',
+        'from_status',
+        'to_status',
+        'changes',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'changes' => 'array',
+        ];
+    }
+
+    public function dataset(): BelongsTo
+    {
+        return $this->belongsTo(Dataset::class);
+    }
+}

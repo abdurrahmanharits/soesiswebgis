@@ -11,28 +11,35 @@ export class ApiError extends Error {
     }
 }
 
-async function getJson(url) {
+async function requestJson(url, { method = 'GET', body } = {}) {
     let response;
 
     try {
         response = await fetch(url, {
-            headers: { Accept: 'application/json' },
+            method,
+            headers: {
+                Accept: 'application/json',
+                ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch {
         throw new ApiError('Cannot reach the server. Check that the backend is running.');
     }
 
-    const body = await response.json().catch(() => null);
+    const json = await response.json().catch(() => null);
 
     if (!response.ok) {
         throw new ApiError(
-            body?.message || `Request failed (HTTP ${response.status}).`,
-            { status: response.status },
+            json?.message || `Request failed (HTTP ${response.status}).`,
+            { status: response.status, errors: json?.errors ?? null },
         );
     }
 
-    return body;
+    return json;
 }
+
+const getJson = (url) => requestJson(url);
 
 export async function listDatasets() {
     const body = await getJson('/api/datasets');
@@ -44,6 +51,24 @@ export async function getDataset(id) {
     const body = await getJson(`/api/datasets/${encodeURIComponent(id)}`);
 
     return body?.data ?? null;
+}
+
+const curationUrl = (id, action = '') => `/api/datasets/${encodeURIComponent(id)}/curation${action ? `/${action}` : ''}`;
+
+/** Save curation metadata (pending datasets only). Resolves to { message, data: dataset }. */
+export function updateCuration(id, payload) {
+    return requestJson(curationUrl(id), { method: 'PATCH', body: payload });
+}
+
+/** action: 'approve' | 'reject' | 'reopen'. Resolves to { message, data: dataset }. */
+export function curationAction(id, action, payload) {
+    return requestJson(curationUrl(id, action), { method: 'POST', body: payload });
+}
+
+export async function getCurationHistory(id) {
+    const body = await getJson(curationUrl(id, 'history'));
+
+    return body?.data ?? [];
 }
 
 /** GeoJSON FeatureCollection (EPSG:4326) with `bbox` and `preview` {limit, total, truncated}. */

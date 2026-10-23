@@ -17,11 +17,12 @@
     </div>
 
     {{-- Summary --}}
-    <dl class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <dl class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         @foreach ([
             ['summary-total', 'Total datasets', 'bg-slate-400'],
-            ['summary-ready', 'Ready', 'bg-emerald-500'],
             ['summary-processing', 'Processing', 'bg-sky-500'],
+            ['summary-pending', 'Pending review', 'bg-amber-500'],
+            ['summary-approved', 'Approved', 'bg-emerald-500'],
             ['summary-failed', 'Failed', 'bg-rose-500'],
         ] as [$id, $label, $dot])
             <div class="rounded-lg border border-slate-200 bg-white px-5 py-4">
@@ -92,7 +93,9 @@
                             <option value="">All statuses</option>
                             <option value="queued">Queued</option>
                             <option value="processing">Processing</option>
-                            <option value="ready_for_curation">Ready</option>
+                            <option value="pending">Pending review</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
                             <option value="failed">Failed</option>
                         </select>
                     </label>
