@@ -3,11 +3,14 @@
 use App\Http\Controllers\Api\DatasetController;
 use App\Http\Controllers\Api\DatasetCurationController;
 use App\Http\Controllers\Api\DatasetPreviewController;
+use App\Http\Controllers\Api\MapLayerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/datasets', [DatasetController::class, 'index']);
 Route::post('/datasets', [DatasetController::class, 'store']);
 Route::get('/datasets/{dataset}', [DatasetController::class, 'show']);
+
+Route::get('/map/layers', [MapLayerController::class, 'index'])->name('api.map.layers');
 
 Route::prefix('/datasets/{dataset}/preview')
     ->whereUuid('dataset')

@@ -11,6 +11,11 @@ services:
 
     working_dir: /var/www/html
 
+    # Set here rather than only in api/.env: once `php artisan optimize` caches the
+    # config, Laravel no longer loads .env and artisan serve would fall back to 1 worker.
+    environment:
+      PHP_CLI_SERVER_WORKERS: "4"
+
     volumes:
       - ./api:/var/www/html
 

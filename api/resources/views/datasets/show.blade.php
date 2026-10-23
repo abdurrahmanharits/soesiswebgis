@@ -26,7 +26,11 @@
                 <h1 id="detail-title" class="text-2xl font-semibold tracking-tight break-words"></h1>
                 <p id="detail-subtitle" class="mt-1 truncate font-mono text-sm text-slate-500"></p>
             </div>
-            <div id="detail-badges" class="flex shrink-0 items-center gap-2"></div>
+            <div class="flex shrink-0 items-center gap-3">
+                <div id="detail-badges" class="flex items-center gap-2"></div>
+                {{-- Shown by detail.js for approved datasets only. --}}
+                <a id="detail-open-map" href="{{ route('map.index') }}" class="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 ring-inset hover:bg-emerald-50" hidden>Open in map</a>
+            </div>
         </div>
 
         <div id="detail-notice" class="mt-6 empty:hidden"></div>

@@ -71,6 +71,13 @@ export async function getCurationHistory(id) {
     return body?.data ?? [];
 }
 
+/** Lightweight /map catalogue: approved + pending ready datasets with EPSG:4326 extents. */
+export async function listMapLayers() {
+    const body = await getJson('/api/map/layers');
+
+    return body?.data ?? [];
+}
+
 /** GeoJSON FeatureCollection (EPSG:4326) with `bbox` and `preview` {limit, total, truncated}. */
 export function getVectorPreview(id) {
     return getJson(`/api/datasets/${encodeURIComponent(id)}/preview/vector`);

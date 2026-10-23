@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dataset;
+use App\Support\DatasetExtent;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -84,7 +85,7 @@ class DatasetPreviewController extends Controller
 
         $collection = array_filter([
             'type' => 'FeatureCollection',
-            'bbox' => $this->vectorBbox($dataset, (int) $geometryColumn->srid),
+            'bbox' => DatasetExtent::fromBbox($dataset->bbox, (int) $geometryColumn->srid),
             'preview' => [
                 'limit' => $limit,
                 'total' => $total,
@@ -144,7 +145,7 @@ class DatasetPreviewController extends Controller
                 'crs' => $dataset->crs,
                 'srid' => $dataset->srid,
                 'proj4' => trim($proj4),
-                'extent' => $this->wgs84Extent($dataset->metadata),
+                'extent' => DatasetExtent::fromWgs84Polygon($dataset->metadata['wgs84Extent'] ?? null),
                 'nodata' => $dataset->nodata,
                 'band_count' => $dataset->band_count,
                 'statistics' => $this->rasterStatistics($dataset, $path),
@@ -179,52 +180,6 @@ class DatasetPreviewController extends Controller
         }
 
         return $path;
-    }
-
-    /**
-     * datasets.bbox ([minX, minY, maxX, maxY] in the source CRS) as EPSG:4326.
-     */
-    private function vectorBbox(Dataset $dataset, int $srid): ?array
-    {
-        $bbox = $dataset->bbox;
-
-        if (! is_array($bbox) || count($bbox) !== 4 || count(array_filter($bbox, 'is_numeric')) !== 4) {
-            return null;
-        }
-
-        $extent = DB::selectOne(
-            'select ST_XMin(e) as minx, ST_YMin(e) as miny, ST_XMax(e) as maxx, ST_YMax(e) as maxy
-             from (select ST_Transform(ST_MakeEnvelope(?, ?, ?, ?, ?), 4326) as e) x',
-            [...array_map('floatval', array_values($bbox)), $srid],
-        );
-
-        return [(float) $extent->minx, (float) $extent->miny, (float) $extent->maxx, (float) $extent->maxy];
-    }
-
-    /**
-     * Bounding box of gdalinfo's wgs84Extent polygon as [minLon, minLat, maxLon, maxLat].
-     */
-    private function wgs84Extent(?array $metadata): ?array
-    {
-        $ring = $metadata['wgs84Extent']['coordinates'][0] ?? null;
-
-        if (! is_array($ring) || $ring === []) {
-            return null;
-        }
-
-        $xs = [];
-        $ys = [];
-
-        foreach ($ring as $point) {
-            if (! is_array($point) || ! is_numeric($point[0] ?? null) || ! is_numeric($point[1] ?? null)) {
-                return null;
-            }
-
-            $xs[] = (float) $point[0];
-            $ys[] = (float) $point[1];
-        }
-
-        return [min($xs), min($ys), max($xs), max($ys)];
     }
 
     /**

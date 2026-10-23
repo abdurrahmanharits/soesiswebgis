@@ -4,16 +4,7 @@ import { register } from 'ol/proj/proj4.js';
 import GeoTIFF from 'ol/source/GeoTIFF.js';
 import proj4 from 'proj4';
 import { getRasterInfo } from '../datasets/api.js';
-
-// Low → high values; reads as a hypsometric (terrain) ramp for DEMs.
-export const RAMP = [
-    [43, 122, 61],
-    [143, 191, 90],
-    [232, 217, 138],
-    [185, 138, 82],
-    [140, 90, 60],
-    [242, 242, 242],
-];
+import { RAMP } from './ramp.js';
 
 /**
  * Makes the dataset CRS known to OpenLayers using the proj4 definition from
@@ -42,10 +33,11 @@ function rampStyle({ minimum, maximum }, hasNodata) {
 }
 
 /**
- * Loads the private COG through the Range-enabled preview endpoint.
- * Resolves to { layer, extent (EPSG:4326 or null), notices, legend }.
+ * Builds a layer (not added to a map) reading the private COG through the
+ * Range-enabled preview endpoint.
+ * Resolves to { layer, source, extent (EPSG:4326 or null), notices, legend }.
  */
-export async function loadRasterLayer(map, dataset) {
+export async function loadRasterLayer(dataset) {
     const info = await getRasterInfo(dataset.id);
 
     ensureProjection(info.srid, info.proj4);
@@ -66,8 +58,6 @@ export async function loadRasterLayer(map, dataset) {
         opacity: 0.85,
         ...(statistics ? { style: rampStyle(statistics, hasNodata) } : {}),
     });
-
-    map.addLayer(layer);
 
     const notices = [];
     let extent = info.extent;

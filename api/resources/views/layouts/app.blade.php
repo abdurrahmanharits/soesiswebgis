@@ -31,9 +31,15 @@
                        @if (request()->routeIs('datasets.*')) aria-current="page" @endif>
                         Datasets
                     </a>
-                    <span class="cursor-not-allowed rounded-md px-3 py-2 text-slate-400" title="Map preview is planned for the next milestone" aria-disabled="true">
-                        Map <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-500 uppercase">Soon</span>
-                    </span>
+                    <a href="{{ route('map.index') }}"
+                       @class([
+                           'rounded-md px-3 py-2 font-medium',
+                           'bg-slate-100 text-slate-900' => request()->routeIs('map.*'),
+                           'text-slate-600 hover:text-slate-900' => ! request()->routeIs('map.*'),
+                       ])
+                       @if (request()->routeIs('map.*')) aria-current="page" @endif>
+                        Map
+                    </a>
                 </nav>
             </div>
         </header>

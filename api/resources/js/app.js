@@ -6,6 +6,7 @@
 const pages = {
     'datasets.index': () => import('./datasets/list.js').then((m) => m.initDatasetList()),
     'datasets.show': (root) => import('./datasets/detail.js').then((m) => m.initDatasetDetail(root)),
+    'map.index': () => import('./map/page.js').then((m) => m.initMapPage()),
 };
 
 const root = document.querySelector('[data-page]');

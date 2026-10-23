@@ -1,17 +1,7 @@
-import 'ol/ol.css';
-import Map from 'ol/Map.js';
-import View from 'ol/View.js';
-import { ScaleLine, defaults as defaultControls } from 'ol/control.js';
-import { transformExtent } from 'ol/proj.js';
-import { createBasemaps } from './basemaps.js';
+import { createMap, fitExtents } from './core.js';
+import { legendParts } from './legend.js';
 
 const $ = (id) => document.getElementById(id);
-
-const FIT_OPTIONS = { padding: [40, 40, 40, 40], maxZoom: 18, duration: 0 };
-
-function formatValue(value) {
-    return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
 
 function renderLegend(element, legend) {
     if (!legend) {
@@ -19,11 +9,11 @@ function renderLegend(element, legend) {
         return;
     }
 
-    const gradient = legend.ramp.map((rgb) => `rgb(${rgb.join(' ')})`).join(', ');
+    const { gradient, min, max } = legendParts(legend);
 
-    element.querySelector('[data-legend-bar]').style.background = `linear-gradient(to right, ${gradient})`;
-    element.querySelector('[data-legend-min]').textContent = formatValue(legend.minimum);
-    element.querySelector('[data-legend-max]').textContent = formatValue(legend.maximum);
+    element.querySelector('[data-legend-bar]').style.background = gradient;
+    element.querySelector('[data-legend-min]').textContent = min;
+    element.querySelector('[data-legend-max]').textContent = max;
     element.hidden = false;
 }
 
@@ -39,7 +29,7 @@ function renderNotices(element, notices) {
 }
 
 /**
- * Builds the preview map inside the static markup of datasets/show.blade.php.
+ * Single-dataset preview inside the static markup of datasets/show.blade.php.
  * Called once per page, after the dataset reaches ready_for_curation.
  */
 export async function initDatasetPreview(dataset) {
@@ -57,12 +47,7 @@ export async function initDatasetPreview(dataset) {
         basemapButtons: [...document.querySelectorAll('[data-basemap]')],
     };
 
-    const map = new Map({
-        target: ui.map,
-        layers: createBasemaps(ui.basemapButtons),
-        view: new View({ center: [0, 0], zoom: 2 }),
-        controls: defaultControls().extend([new ScaleLine()]),
-    });
+    const { map } = createMap(ui.map, { basemapButtons: ui.basemapButtons });
 
     function showError(message) {
         ui.loading.hidden = true;
@@ -77,9 +62,16 @@ export async function initDatasetPreview(dataset) {
 
     try {
         // Loaded per format so vector pages don't pull in the GeoTIFF decoder.
-        result = dataset.format === 'geotiff'
-            ? await import('./raster.js').then((m) => m.loadRasterLayer(map, dataset))
-            : await import('./vector.js').then((m) => m.loadVectorLayer(map, dataset, ui));
+        if (dataset.format === 'geotiff') {
+            const { loadRasterLayer } = await import('./raster.js');
+            result = await loadRasterLayer(dataset);
+            map.addLayer(result.layer);
+        } else {
+            const [{ loadVectorLayer }, { createInspector }] = await Promise.all([import('./vector.js'), import('./inspect.js')]);
+            result = await loadVectorLayer(dataset, { projection: map.getView().getProjection() });
+            map.addLayer(result.layer);
+            createInspector(map, ui.popup, { describe: (layer) => (layer === result.layer ? { title: null } : null) });
+        }
     } catch (error) {
         showError(error.message);
         return map;
@@ -88,7 +80,7 @@ export async function initDatasetPreview(dataset) {
     const { layer, extent, notices } = result;
 
     if (extent) {
-        map.getView().fit(transformExtent(extent, 'EPSG:4326', map.getView().getProjection()), FIT_OPTIONS);
+        fitExtents(map, [extent]);
     }
 
     ui.toggle.disabled = false;

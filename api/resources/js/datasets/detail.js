@@ -9,6 +9,7 @@ import {
     isPending,
     LIFECYCLE,
     lifecycleBadge,
+    lifecycleKey,
     orDash,
     statusBadge,
 } from './format.js';
@@ -152,6 +153,8 @@ function render(d) {
     $('detail-title').textContent = datasetTitle(d);
     $('detail-subtitle').textContent = d.original_filename ?? '';
     $('detail-badges').innerHTML = `${formatBadge(d.format)} ${lifecycleBadge(d)}`;
+    $('detail-open-map').hidden = lifecycleKey(d) !== 'approved';
+    $('detail-open-map').href = `/map?layers=${encodeURIComponent(d.id)}`;
     $('detail-notice').innerHTML = statusNotice(d);
     $('detail-body').innerHTML = `
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">${common}${specific}</div>

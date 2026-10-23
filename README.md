@@ -56,6 +56,11 @@ docker compose exec app php artisan migrate
 cd api
 npm install
 npm run build
+cd ..
+
+# 7. Cache config/route/view Laravel (mempercepat request), lalu restart server
+docker compose exec app php artisan optimize
+docker compose restart app worker
 ```
 
 Buka **http://localhost:8000** (otomatis diarahkan ke `/datasets`).
@@ -122,6 +127,17 @@ api/                        aplikasi Laravel
 
 ## Catatan lingkungan pengembangan
 
+- **Cache Laravel (`php artisan optimize`).** Config, route, event, dan view di-cache agar setiap
+  request jauh lebih cepat di bind mount Windows. Konsekuensinya, setelah mengubah `api/.env`,
+  file di `api/config/`, atau `api/routes/`, jalankan ulang:
+  ```bash
+  docker compose exec app php artisan optimize
+  docker compose restart app worker
+  ```
+  Untuk mematikan cache: `docker compose exec app php artisan optimize:clear`.
+  Test tidak terpengaruh: `phpunit.xml` selalu membaca config langsung.
+- **Jumlah worker server** (`PHP_CLI_SERVER_WORKERS`) diatur di `docker-compose.yml`, bukan di `.env`,
+  karena `.env` tidak dibaca lagi setelah config di-cache.
 - **Perubahan PHP/Blade terlambat terlihat (hingga 60 detik).** OPcache hanya memeriksa ulang file
   setiap 60 detik agar server tetap cepat di bind mount Windows. Untuk langsung: `docker compose restart app`.
 - **Perubahan `api/.env`** perlu `docker compose restart app worker`.
