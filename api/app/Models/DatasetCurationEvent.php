@@ -11,6 +11,7 @@ class DatasetCurationEvent extends Model
 
     protected $fillable = [
         'dataset_id',
+        'user_id',
         'action',
         'reviewer_name',
         'note',
@@ -29,5 +30,11 @@ class DatasetCurationEvent extends Model
     public function dataset(): BelongsTo
     {
         return $this->belongsTo(Dataset::class);
+    }
+
+    /** Null for events recorded before authentication (reviewer_name is then the only identity). */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

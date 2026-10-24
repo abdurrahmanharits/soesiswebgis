@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dataset;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,6 +12,14 @@ use Tests\TestCase;
 class DatasetVectorPreviewTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Internal endpoints require a signed-in account.
+        $this->actingAs(User::factory()->role('uploader')->create());
+    }
 
     private const TABLE = 'ds_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 

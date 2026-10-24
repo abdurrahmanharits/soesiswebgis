@@ -4,7 +4,16 @@ import { showToast } from '../ui/toast.js';
 
 const $ = (id) => document.getElementById(id);
 
-const REVIEWER_KEY = 'soesis.reviewerName';
+/** Signed-in account (meta tag in layouts/app.blade.php); the server enforces the same rules. */
+function currentUser() {
+    try {
+        return JSON.parse(document.querySelector('meta[name="soesis-user"]')?.content ?? 'null');
+    } catch {
+        return null;
+    }
+}
+
+const DECIDERS = ['curator', 'admin'];
 
 const FIELDS = [
     'title', 'description', 'keywords', 'topic_category', 'source', 'source_organization',
@@ -25,14 +34,6 @@ const UNAVAILABLE = {
     failed: 'Curation unavailable because dataset processing failed.',
 };
 
-function storage(action, value) {
-    try {
-        return action === 'get' ? localStorage.getItem(REVIEWER_KEY) : localStorage.setItem(REVIEWER_KEY, value);
-    } catch {
-        return null;
-    }
-}
-
 function fillOptions(select, options) {
     Object.entries(options).forEach(([value, label]) => select.add(new Option(label, value)));
 }
@@ -50,8 +51,9 @@ export function createCurationPanel({ onChange }) {
         form: $('curation-form'),
         locked: $('curation-locked'),
         save: $('curation-save'),
-        reviewer: $('cur-reviewer'),
         note: $('cur-note'),
+        noteWrap: $('cur-note-wrap'),
+        permission: $('cur-permission'),
         approve: $('curation-approve'),
         reject: $('curation-reject'),
         reopen: $('curation-reopen'),
@@ -68,7 +70,12 @@ export function createCurationPanel({ onChange }) {
 
     fillOptions(field('topic_category'), TOPIC_CATEGORIES);
     fillOptions(field('license'), LICENSES);
-    el.reviewer.value = storage('get') ?? '';
+
+    const user = currentUser();
+    const canDecide = DECIDERS.includes(user?.role);
+    const isOwn = (d) => d.uploaded_by != null && d.uploaded_by === user?.id;
+    // Uploaders complete metadata of their own uploads; curators/admins edit any.
+    const canEdit = (d) => canDecide || isOwn(d);
 
     let dataset = null;
     let filledFrom = null;
@@ -114,7 +121,7 @@ export function createCurationPanel({ onChange }) {
 
             p.textContent = text ?? '';
             p.hidden = !text;
-            (key === 'reviewer_name' ? el.reviewer : key === 'note' ? el.note : field(key))
+            (key === 'note' ? el.note : field(key))
                 ?.setAttribute('aria-invalid', text ? 'true' : 'false');
         });
 
@@ -140,20 +147,37 @@ export function createCurationPanel({ onChange }) {
         if (!curatable) return;
 
         const pending = d.curation_status === 'pending';
+        const editable = canEdit(d);
+        const ownUpload = isOwn(d);
 
         [...el.form.elements].forEach((input) => {
-            input.disabled = !pending || busy;
+            input.disabled = !pending || busy || !editable;
         });
 
         el.locked.hidden = pending;
-        el.approve.hidden = !pending;
-        el.reject.hidden = !pending;
-        el.reopen.hidden = pending;
-        el.approveHint.hidden = !pending;
+        el.approve.hidden = !pending || !canDecide;
+        el.reject.hidden = !pending || !canDecide;
+        el.reopen.hidden = pending || !canDecide;
+        el.approveHint.hidden = !pending || !canDecide;
+        el.noteWrap.hidden = !canDecide;
         el.noteHint.hidden = !pending;
-        [el.approve, el.reject, el.reopen, el.reviewer, el.note].forEach((control) => {
+        [el.approve, el.reject, el.reopen, el.note].forEach((control) => {
             control.disabled = busy;
         });
+
+        // Separation of duties: the uploader cannot approve their own dataset.
+        if (pending && canDecide && ownUpload) el.approve.disabled = true;
+
+        let permission = '';
+        if (!canDecide) {
+            permission = editable
+                ? 'You can complete the metadata of datasets you uploaded. A curator approves or rejects them.'
+                : 'Only the uploader or a curator can edit this metadata. Approval is done by curators.';
+        } else if (pending && ownUpload) {
+            permission = 'You uploaded this dataset, so another curator or admin must approve it.';
+        }
+        el.permission.textContent = permission;
+        el.permission.hidden = !permission;
     }
 
     async function loadHistory() {
@@ -187,14 +211,6 @@ export function createCurationPanel({ onChange }) {
         }
     }
 
-    function reviewerName() {
-        const name = el.reviewer.value.trim();
-
-        if (name) storage('set', name);
-
-        return name;
-    }
-
     function applyResult(body) {
         dataset = body.data;
         fillForm(dataset);
@@ -220,7 +236,7 @@ export function createCurationPanel({ onChange }) {
     }
 
     async function save({ quiet = false } = {}) {
-        const body = await updateCuration(dataset.id, { reviewer_name: reviewerName(), ...payload() });
+        const body = await updateCuration(dataset.id, payload());
 
         applyResult(body);
         if (!quiet) showToast(body.message, 'success');
@@ -242,10 +258,7 @@ export function createCurationPanel({ onChange }) {
     }
 
     async function act(action) {
-        const body = await curationAction(dataset.id, action, {
-            reviewer_name: reviewerName(),
-            note: el.note.value.trim() || null,
-        });
+        const body = await curationAction(dataset.id, action, { note: el.note.value.trim() || null });
 
         el.note.value = '';
         applyResult(body);

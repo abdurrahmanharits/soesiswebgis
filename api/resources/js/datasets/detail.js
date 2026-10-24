@@ -123,6 +123,10 @@ function render(d) {
         row('Review status', d.status === 'ready_for_curation' ? statusBadge(d.curation_status, LIFECYCLE) : DASH),
         row('CRS', orDash(d.crs), { mono: true }),
         row('SRID', orDash(d.srid), { mono: true }),
+        // Provenance; empty for datasets uploaded before sign-in existed.
+        row('Uploaded by', d.uploader
+            ? `${escapeHtml(d.uploader.name)}${d.organization ? ` <span class="text-slate-500">· ${escapeHtml(d.organization.name)}</span>` : ''}`
+            : '<span class="text-slate-500">Unknown (uploaded before sign-in)</span>'),
         row('Created at', formatDate(d.created_at)),
         row('Updated at', formatDate(d.updated_at)),
         row('Dataset ID', orDash(d.id), { mono: true }),

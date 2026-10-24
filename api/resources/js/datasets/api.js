@@ -3,9 +3,16 @@
  */
 
 import { t } from '../i18n.js';
+import { notifySessionExpired } from '../ui/session.js';
 
 /** Internal preview endpoints; the public catalogue passes '/api/catalogue'. */
 export const DATASET_PREVIEW_BASE = '/api/datasets';
+
+/** Laravel session CSRF token for write requests (meta tag in layouts/app.blade.php). */
+const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+/** 401 = not signed in (any more); 419 = session/CSRF token expired. */
+const isSessionExpired = (status) => status === 401 || status === 419;
 
 export class ApiError extends Error {
     constructor(message, { status = 0, errors = null } = {}) {
@@ -25,6 +32,7 @@ async function requestJson(url, { method = 'GET', body } = {}) {
             headers: {
                 Accept: 'application/json',
                 ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+                ...(method === 'GET' ? {} : { 'X-CSRF-TOKEN': csrfToken() }),
             },
             body: body === undefined ? undefined : JSON.stringify(body),
         });
@@ -35,6 +43,8 @@ async function requestJson(url, { method = 'GET', body } = {}) {
     const json = await response.json().catch(() => null);
 
     if (!response.ok) {
+        if (isSessionExpired(response.status)) notifySessionExpired();
+
         throw new ApiError(
             json?.message ? t(json.message) : t('Request failed (HTTP {status}).', { status: response.status }),
             { status: response.status, errors: json?.errors ?? null },
@@ -116,6 +126,7 @@ export function uploadDataset({ title, file }, { onProgress } = {}) {
 
         xhr.open('POST', '/api/datasets');
         xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken());
         xhr.responseType = 'json';
 
         xhr.upload.addEventListener('progress', (event) => {
@@ -136,6 +147,12 @@ export function uploadDataset({ title, file }, { onProgress } = {}) {
 
             if (xhr.status === 413) {
                 message = 'File is larger than the server accepts (maximum 512 MB).';
+            }
+
+            // The upload form keeps its title and file, so the user can sign in again and retry.
+            if (isSessionExpired(xhr.status)) {
+                message = 'Session expired. Please sign in again, then upload the file again.';
+                notifySessionExpired();
             }
 
             reject(new ApiError(message, { status: xhr.status, errors: body?.errors ?? null }));

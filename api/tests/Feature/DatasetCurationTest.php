@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dataset;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -17,6 +18,17 @@ class DatasetCurationTest extends TestCase
         'source' => 'Peta desa partisipatif 2025',
         'license' => 'CC-BY-4.0',
     ];
+
+    private User $curator;
+
+    /** Curation now runs as the signed-in account; reviewer_name comes from it. */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->curator = User::factory()->role('curator')->create(['name' => 'Reviewer A']);
+        $this->actingAs($this->curator);
+    }
 
     private function dataset(array $attributes = []): Dataset
     {
@@ -46,7 +58,6 @@ class DatasetCurationTest extends TestCase
         $dataset = $this->dataset();
 
         $this->patchJson($this->url($dataset), [
-            'reviewer_name' => 'Reviewer A',
             'description' => 'Batas administrasi desa.',
             'keywords' => ['batas desa', 'administrasi'],
             'topic_category' => 'boundaries',
@@ -71,7 +82,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset();
 
-        $this->patchJson($this->url($dataset), ['reviewer_name' => 'A', 'title' => 'Uploaded title'])->assertOk();
+        $this->patchJson($this->url($dataset), ['title' => 'Uploaded title'])->assertOk();
 
         $this->assertDatabaseCount('dataset_curation_events', 0);
     }
@@ -79,7 +90,6 @@ class DatasetCurationTest extends TestCase
     public function test_invalid_metadata_returns_422(): void
     {
         $this->patchJson($this->url($this->dataset()), [
-            'reviewer_name' => 'A',
             'topic_category' => 'not-a-category',
             'license' => 'other',
             'contact_email' => 'not-an-email',
@@ -90,18 +100,27 @@ class DatasetCurationTest extends TestCase
             ->assertJsonValidationErrors(['topic_category', 'license_other', 'contact_email', 'temporal_end']);
     }
 
-    public function test_reviewer_name_is_required(): void
+    public function test_events_are_recorded_under_the_signed_in_account(): void
     {
-        $this->postJson($this->url($this->dataset(self::REQUIRED), 'approve'), [])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['reviewer_name']);
+        $dataset = $this->dataset(self::REQUIRED);
+
+        // A typed reviewer name is ignored: identity comes from the session.
+        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'Someone Else'])->assertOk();
+
+        $this->assertDatabaseHas('dataset_curation_events', [
+            'dataset_id' => $dataset->id,
+            'action' => 'approved',
+            'user_id' => $this->curator->id,
+            'reviewer_name' => 'Reviewer A',
+        ]);
+        $this->assertDatabaseMissing('dataset_curation_events', ['reviewer_name' => 'Someone Else']);
     }
 
     public function test_approve_requires_minimum_metadata(): void
     {
         $dataset = $this->dataset(['title' => 'Only a title']);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'A'])
+        $this->postJson($this->url($dataset, 'approve'), [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['description', 'source', 'license']);
 
@@ -113,7 +132,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset([...self::REQUIRED, 'license' => 'other']);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'A'])
+        $this->postJson($this->url($dataset, 'approve'), [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['license_other']);
     }
@@ -122,7 +141,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset(self::REQUIRED);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'Reviewer A', 'note' => 'Metadata dan preview valid.'])
+        $this->postJson($this->url($dataset, 'approve'), ['note' => 'Metadata dan preview valid.'])
             ->assertOk()
             ->assertJsonPath('data.curation_status', 'approved')
             ->assertJsonPath('data.status', 'ready_for_curation');
@@ -141,7 +160,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset();
 
-        $this->postJson($this->url($dataset, 'reject'), ['reviewer_name' => 'A', 'note' => 'Sumber tidak jelas.'])
+        $this->postJson($this->url($dataset, 'reject'), ['note' => 'Sumber tidak jelas.'])
             ->assertOk()
             ->assertJsonPath('data.curation_status', 'rejected');
 
@@ -155,7 +174,7 @@ class DatasetCurationTest extends TestCase
 
     public function test_reject_requires_a_reason(): void
     {
-        $this->postJson($this->url($this->dataset(), 'reject'), ['reviewer_name' => 'A'])
+        $this->postJson($this->url($this->dataset(), 'reject'), [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['note']);
     }
@@ -164,7 +183,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset(['postgis_schema' => 'ingest', 'postgis_table' => 'ds_x', 'processed_path' => 'processed/x/cog.tif']);
 
-        $this->postJson($this->url($dataset, 'reject'), ['reviewer_name' => 'A', 'note' => 'No'])->assertOk();
+        $this->postJson($this->url($dataset, 'reject'), ['note' => 'No'])->assertOk();
 
         $this->assertDatabaseHas('datasets', [
             'id' => $dataset->id,
@@ -178,7 +197,7 @@ class DatasetCurationTest extends TestCase
         foreach (['approved', 'rejected'] as $status) {
             $dataset = $this->dataset(['curation_status' => $status]);
 
-            $this->postJson($this->url($dataset, 'reopen'), ['reviewer_name' => 'A', 'note' => 'Revisi'])
+            $this->postJson($this->url($dataset, 'reopen'), ['note' => 'Revisi'])
                 ->assertOk()
                 ->assertJsonPath('data.curation_status', 'pending');
 
@@ -196,16 +215,16 @@ class DatasetCurationTest extends TestCase
         $approved = $this->dataset([...self::REQUIRED, 'curation_status' => 'approved']);
         $pending = $this->dataset();
 
-        $this->postJson($this->url($approved, 'approve'), ['reviewer_name' => 'A'])->assertStatus(409);
-        $this->postJson($this->url($approved, 'reject'), ['reviewer_name' => 'A', 'note' => 'x'])->assertStatus(409);
-        $this->postJson($this->url($pending, 'reopen'), ['reviewer_name' => 'A'])->assertStatus(409);
+        $this->postJson($this->url($approved, 'approve'), [])->assertStatus(409);
+        $this->postJson($this->url($approved, 'reject'), ['note' => 'x'])->assertStatus(409);
+        $this->postJson($this->url($pending, 'reopen'), [])->assertStatus(409);
     }
 
     public function test_approved_metadata_cannot_be_edited_without_reopening(): void
     {
         $dataset = $this->dataset([...self::REQUIRED, 'curation_status' => 'approved']);
 
-        $this->patchJson($this->url($dataset), ['reviewer_name' => 'A', 'description' => 'Changed'])
+        $this->patchJson($this->url($dataset), ['description' => 'Changed'])
             ->assertStatus(409)
             ->assertJson(['message' => 'Reopen this dataset before editing its metadata.']);
 
@@ -216,17 +235,17 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset([...self::REQUIRED, 'status' => 'failed']);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'A'])
+        $this->postJson($this->url($dataset, 'approve'), [])
             ->assertStatus(409)
             ->assertJson(['message' => 'Curation unavailable because dataset processing failed.']);
 
-        $this->patchJson($this->url($dataset), ['reviewer_name' => 'A', 'description' => 'x'])->assertStatus(409);
+        $this->patchJson($this->url($dataset), ['description' => 'x'])->assertStatus(409);
     }
 
     public function test_processing_dataset_cannot_be_curated(): void
     {
         foreach (['queued', 'processing'] as $status) {
-            $this->postJson($this->url($this->dataset([...self::REQUIRED, 'status' => $status]), 'approve'), ['reviewer_name' => 'A'])
+            $this->postJson($this->url($this->dataset([...self::REQUIRED, 'status' => $status]), 'approve'), [])
                 ->assertStatus(409)
                 ->assertJson(['message' => 'Dataset must finish processing before it can be curated.']);
         }
@@ -236,8 +255,9 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset(self::REQUIRED);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'A'])->assertOk();
-        $this->postJson($this->url($dataset, 'reopen'), ['reviewer_name' => 'B', 'note' => 'Revisi'])->assertOk();
+        $this->postJson($this->url($dataset, 'approve'), [])->assertOk();
+        $this->actingAs(User::factory()->role('admin')->create(['name' => 'B']))
+            ->postJson($this->url($dataset, 'reopen'), ['note' => 'Revisi'])->assertOk();
 
         $this->getJson($this->url($dataset, 'history'))
             ->assertOk()
@@ -258,7 +278,7 @@ class DatasetCurationTest extends TestCase
     {
         $dataset = $this->dataset([...self::REQUIRED, 'format' => 'geotiff', 'processed_path' => 'processed/none/cog.tif']);
 
-        $this->postJson($this->url($dataset, 'approve'), ['reviewer_name' => 'A'])->assertOk();
+        $this->postJson($this->url($dataset, 'approve'), [])->assertOk();
 
         // Passes the ready check (would be 409 otherwise); 404 only because no file exists in tests.
         $this->getJson("/api/datasets/{$dataset->id}/preview/raster")

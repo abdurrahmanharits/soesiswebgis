@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dataset;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -114,7 +115,7 @@ class CataloguePagesTest extends TestCase
 
     public function test_internal_map_page_is_unchanged(): void
     {
-        $this->get('/map')
+        $this->actingAs(User::factory()->create())->get('/map')
             ->assertOk()
             ->assertSee('<html lang="en">', false)
             ->assertSee('data-page="map.index"', false)

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dataset;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,9 @@ class DatasetRasterPreviewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Internal endpoints require a signed-in account.
+        $this->actingAs(User::factory()->role('uploader')->create());
 
         Storage::fake('local');
         Storage::disk('local')->put(self::COG_PATH, str_repeat('A', self::FILE_SIZE));

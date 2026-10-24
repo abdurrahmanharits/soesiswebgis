@@ -15,7 +15,7 @@
     <body class="min-h-screen bg-slate-100 font-sans text-slate-900 antialiased">
         <header class="border-b border-slate-200 bg-white">
             <div class="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8">
-                <a href="{{ route('catalogue.index') }}" class="flex items-center gap-3">
+                <a href="{{ route('home') }}" class="flex items-center gap-3">
                     <span class="grid size-9 place-items-center rounded-md bg-emerald-700 text-sm font-semibold text-white" aria-hidden="true">S</span>
                     <span class="leading-tight">
                         <span class="block text-sm font-semibold tracking-tight">SoESIS WebGIS</span>
@@ -37,6 +37,12 @@
                         </a>
                     @endforeach
                 </nav>
+
+                {{-- Staff entry point; the internal area itself is English. --}}
+                <a href="{{ auth()->check() ? route('datasets.index') : route('login') }}"
+                   class="ml-auto shrink-0 text-sm font-medium text-slate-500 hover:text-slate-900">
+                    {{ auth()->check() ? 'Area internal' : 'Masuk' }}
+                </a>
             </div>
         </header>
 

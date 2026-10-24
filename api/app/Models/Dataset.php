@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Dataset extends Model
@@ -50,6 +51,10 @@ class Dataset extends Model
         'geographic_description',
         'contact_name',
         'contact_email',
+
+        // Provenance
+        'uploaded_by',
+        'organization_id',
     ];
 
     protected function casts(): array
@@ -68,5 +73,21 @@ class Dataset extends Model
     public function curationEvents(): HasMany
     {
         return $this->hasMany(DatasetCurationEvent::class)->latest('id');
+    }
+
+    public function uploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** Legacy datasets (uploaded before authentication) have no owner. */
+    public function isUploadedBy(User $user): bool
+    {
+        return $this->uploaded_by !== null && (int) $this->uploaded_by === (int) $user->id;
     }
 }

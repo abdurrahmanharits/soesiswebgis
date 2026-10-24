@@ -8,12 +8,16 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * The root URL sends users to the dataset catalogue.
+     * The root URL is the public landing page (no login), linking to the catalogue.
      */
-    public function test_the_application_redirects_to_datasets(): void
+    public function test_the_root_is_the_public_landing_page(): void
     {
-        $response = $this->get('/');
+        $this->withoutVite();
 
-        $response->assertRedirect('/datasets');
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('<html lang="id">', false)
+            ->assertSee('Buka katalog')
+            ->assertSee('Masuk');
     }
 }

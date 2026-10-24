@@ -129,12 +129,10 @@
         <aside class="space-y-5 border-t border-slate-200 bg-slate-50/60 px-5 py-5 lg:border-t-0 lg:border-l">
             <div class="space-y-3">
                 <h3 class="text-sm font-semibold text-slate-900">Review</h3>
-                <div>
-                    <label for="cur-reviewer" class="{{ $label }}">Reviewer name</label>
-                    <input id="cur-reviewer" type="text" maxlength="100" autocomplete="name" class="{{ $input }} bg-white">
-                    <p data-error-for="reviewer_name" class="{{ $error }}" hidden></p>
-                </div>
-                <div>
+                {{-- Events are recorded under the signed-in account (no typed reviewer name). --}}
+                <p class="text-sm text-slate-600">Acting as <strong class="font-medium text-slate-900">{{ auth()->user()->name }}</strong> <span class="text-slate-500">({{ auth()->user()->roleLabel() }})</span></p>
+                <p id="cur-permission" class="rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-700" hidden></p>
+                <div id="cur-note-wrap">
                     <label for="cur-note" class="{{ $label }}">Note <span id="cur-note-hint" class="font-normal text-slate-500">(required to reject)</span></label>
                     <textarea id="cur-note" rows="3" maxlength="2000" class="{{ $input }} bg-white"></textarea>
                     <p data-error-for="note" class="{{ $error }}" hidden></p>

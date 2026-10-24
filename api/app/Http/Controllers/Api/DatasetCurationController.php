@@ -40,7 +40,6 @@ class DatasetCurationController extends Controller
     public function update(Request $request, Dataset $dataset): JsonResponse
     {
         $validated = $request->validate([
-            'reviewer_name' => ['required', 'string', 'max:100'],
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'keywords' => ['sometimes', 'nullable', 'array', 'max:30'],
@@ -60,8 +59,11 @@ class DatasetCurationController extends Controller
             'contact_email' => ['sometimes', 'nullable', 'email', 'max:255'],
         ]);
 
-        $reviewer = $validated['reviewer_name'];
-        unset($validated['reviewer_name']);
+        if (! $request->user()->canCurate() && ! $dataset->isUploadedBy($request->user())) {
+            $this->fail(403, 'You can only edit the metadata of datasets you uploaded.');
+        }
+
+        $reviewer = $this->reviewer($request);
 
         if (($validated['license'] ?? $dataset->license) !== 'other') {
             $validated['license_other'] = null;
@@ -81,7 +83,7 @@ class DatasetCurationController extends Controller
                 $locked->save();
                 $locked->curationEvents()->create([
                     'action' => 'metadata_updated',
-                    'reviewer_name' => $reviewer,
+                    ...$reviewer,
                     'from_status' => 'pending',
                     'to_status' => 'pending',
                     'changes' => $changed,
@@ -100,11 +102,15 @@ class DatasetCurationController extends Controller
     public function approve(Request $request, Dataset $dataset): JsonResponse
     {
         $validated = $request->validate([
-            'reviewer_name' => ['required', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        return $this->transition($dataset, ['pending'], 'approved', 'approved', $validated, function (Dataset $locked) {
+        return $this->transition($request, $dataset, ['pending'], 'approved', 'approved', $validated, function (Dataset $locked) use ($request) {
+            // Separation of duties: nobody approves their own upload (legacy datasets have no uploader).
+            if ($locked->isUploadedBy($request->user())) {
+                $this->fail(403, 'You cannot approve a dataset you uploaded.');
+            }
+
             $missing = array_filter(self::REQUIRED_FOR_APPROVAL, fn ($field) => blank($locked->{$field}));
 
             if ($locked->license === 'other' && blank($locked->license_other)) {
@@ -122,30 +128,28 @@ class DatasetCurationController extends Controller
     public function reject(Request $request, Dataset $dataset): JsonResponse
     {
         $validated = $request->validate([
-            'reviewer_name' => ['required', 'string', 'max:100'],
             'note' => ['required', 'string', 'max:2000'],
         ], [
             'note.required' => 'A reason is required to reject a dataset.',
         ]);
 
-        return $this->transition($dataset, ['pending'], 'rejected', 'rejected', $validated);
+        return $this->transition($request, $dataset, ['pending'], 'rejected', 'rejected', $validated);
     }
 
     public function reopen(Request $request, Dataset $dataset): JsonResponse
     {
         $validated = $request->validate([
-            'reviewer_name' => ['required', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        return $this->transition($dataset, ['approved', 'rejected'], 'pending', 'reopened', $validated);
+        return $this->transition($request, $dataset, ['approved', 'rejected'], 'pending', 'reopened', $validated);
     }
 
     public function history(Dataset $dataset): JsonResponse
     {
         return response()->json([
             'data' => $dataset->curationEvents()
-                ->get(['id', 'action', 'reviewer_name', 'note', 'from_status', 'to_status', 'changes', 'created_at']),
+                ->get(['id', 'user_id', 'action', 'reviewer_name', 'note', 'from_status', 'to_status', 'changes', 'created_at']),
         ]);
     }
 
@@ -153,9 +157,11 @@ class DatasetCurationController extends Controller
      * Applies a status change under a row lock, so concurrent requests (e.g. two
      * tabs) see the current state and an outdated transition gets 409.
      */
-    private function transition(Dataset $dataset, array $from, string $to, string $action, array $input, ?callable $guard = null): JsonResponse
+    private function transition(Request $request, Dataset $dataset, array $from, string $to, string $action, array $input, ?callable $guard = null): JsonResponse
     {
-        $dataset = DB::transaction(function () use ($dataset, $from, $to, $action, $input, $guard) {
+        $reviewer = $this->reviewer($request);
+
+        $dataset = DB::transaction(function () use ($dataset, $from, $to, $action, $input, $guard, $reviewer) {
             $locked = $this->lockCuratable($dataset);
             $current = $locked->curation_status;
 
@@ -168,7 +174,7 @@ class DatasetCurationController extends Controller
             $locked->update(['curation_status' => $to]);
             $locked->curationEvents()->create([
                 'action' => $action,
-                'reviewer_name' => $input['reviewer_name'],
+                ...$reviewer,
                 'note' => $input['note'] ?? null,
                 'from_status' => $current,
                 'to_status' => $to,
@@ -185,6 +191,15 @@ class DatasetCurationController extends Controller
             },
             'data' => $dataset->fresh(),
         ]);
+    }
+
+    /**
+     * The signed-in account behind an event. reviewer_name is kept as a snapshot,
+     * so history still reads correctly if the account is renamed later.
+     */
+    private function reviewer(Request $request): array
+    {
+        return ['user_id' => $request->user()->id, 'reviewer_name' => $request->user()->name];
     }
 
     private function lockCuratable(Dataset $dataset): Dataset

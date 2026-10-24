@@ -66,9 +66,14 @@ cd ..
 # 7. Cache config/route/view Laravel (mempercepat request), lalu restart server
 docker compose exec app php artisan optimize
 docker compose restart app worker
+
+# 8. Buat akun admin pertama (password diketik tersembunyi; hanya bisa sekali,
+#    selama belum ada admin). User lain dibuat admin di /admin/users.
+docker compose exec app php artisan soesis:create-admin
 ```
 
-Buka **http://localhost:8000** (otomatis diarahkan ke `/datasets`).
+Buka **http://localhost:8000** (halaman depan publik). Area internal ada di
+**http://localhost:8000/login** (link "Masuk" di pojok kanan atas).
 
 Di Windows PowerShell, ganti `cp` dengan `Copy-Item`.
 
@@ -139,8 +144,36 @@ api/                        aplikasi Laravel
 | GET | `/api/catalogue/{id}` | Detail publik (404 jika belum/tidak lagi approved) |
 | GET | `/api/catalogue/{id}/preview/{vector,raster,raster/info}` | Pratinjau publik, khusus approved |
 
-Area internal (`/datasets`, `/map`, `/api/datasets/*`) belum diproteksi login. Aplikasi hanya
-mendengarkan di `127.0.0.1`, jadi jangan buka port ke jaringan sebelum ada proteksi.
+Endpoint internal (`/api/datasets*`, `/api/map/layers`) memakai session login + CSRF (header
+`X-CSRF-TOKEN`); tanpa login → `401 {"message":"Unauthenticated."}`, tanpa hak → `403`.
+Endpoint `/api/catalogue*` tetap terbuka.
+
+## Akun dan peran
+
+Area publik (`/`, `/catalogue`, `/catalogue/{id}`, `/catalogue/map`) terbuka tanpa login.
+Area internal wajib login dengan e-mail atau username. Tidak ada registrasi mandiri.
+
+| Aksi | Uploader | Curator | Admin |
+|---|:-:|:-:|:-:|
+| Lihat `/datasets`, detail, preview, `/map`, riwayat kurasi | ✓ | ✓ | ✓ |
+| Upload dataset | ✓ | ✓ | ✓ |
+| Edit metadata kurasi | dataset sendiri | ✓ | ✓ |
+| Approve | – | ✓¹ | ✓¹ |
+| Reject / Reopen | – | ✓ | ✓ |
+| Kelola user & organisasi (`/admin/users`) | – | – | ✓ |
+
+¹ Tidak ada yang boleh meng-approve dataset yang ia upload sendiri. Dataset lama (sebelum ada
+login) tidak punya pemilik, jadi bisa di-approve curator/admin mana pun.
+
+- Riwayat kurasi mencatat akun yang login (`user_id` + nama). Riwayat lama (nama yang dulu diketik)
+  tetap tampil apa adanya.
+- Organisasi hanya untuk provenance: dataset menyimpan uploader dan organisasinya; tidak membatasi akses.
+- User dinonaktifkan (bukan dihapus) agar riwayat tetap utuh; sesi user nonaktif berakhir di request berikutnya.
+- Sesi berlaku 120 menit (`SESSION_LIFETIME`). Login dibatasi 5 percobaan gagal per menit.
+- Lupa password: admin mengatur ulang di `/admin/users`, atau lewat CLI:
+  ```bash
+  docker compose exec app php artisan soesis:reset-password <email-atau-username>
+  ```
 
 ## Catatan lingkungan pengembangan
 

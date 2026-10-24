@@ -19,7 +19,8 @@ class DatasetController extends Controller
     public function show(Dataset $dataset)
     {
         return response()->json([
-            'data' => $dataset,
+            // Provenance names for the internal detail page (null for legacy uploads).
+            'data' => $dataset->load(['uploader:id,name', 'organization:id,name']),
         ]);
     }
 
@@ -51,6 +52,8 @@ class DatasetController extends Controller
             'original_filename' => $file->getClientOriginalName(),
             'format' => $format,
             'status' => 'queued',
+            'uploaded_by' => $request->user()->id,
+            'organization_id' => $request->user()->organization_id,
         ]);
 
         $storedExtension = $extension === 'tiff'

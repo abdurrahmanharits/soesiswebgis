@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dataset;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -69,6 +70,12 @@ class CatalogueTest extends TestCase
             // Defensive: approved but no longer ingested must not be public either.
             'approved but failed' => $this->dataset(['title' => 'Approved failed', 'status' => 'failed']),
         ];
+    }
+
+    /** Internal endpoints need an account; the public ones are checked as guest first. */
+    private function staff(): User
+    {
+        return User::factory()->role('curator')->create();
     }
 
     private function createTable(): void
@@ -213,7 +220,8 @@ class CatalogueTest extends TestCase
 
         $this->getJson("/api/catalogue/{$dataset->id}")->assertOk();
 
-        $this->postJson("/api/datasets/{$dataset->id}/curation/reopen", ['reviewer_name' => 'QA'])->assertOk();
+        $curator = User::factory()->role('curator')->create();
+        $this->actingAs($curator)->postJson("/api/datasets/{$dataset->id}/curation/reopen")->assertOk();
 
         $this->getJson('/api/catalogue')->assertJsonCount(0, 'data');
         $this->getJson("/api/catalogue/{$dataset->id}")->assertNotFound();
@@ -246,7 +254,7 @@ class CatalogueTest extends TestCase
                 ->assertExactJson(['message' => 'Dataset not found.']);
 
             // The internal preview keeps working for curators.
-            $this->get("/api/datasets/{$dataset->id}/preview/vector")->assertOk();
+            $this->actingAs($this->staff())->get("/api/datasets/{$dataset->id}/preview/vector")->assertOk();
         }
     }
 
@@ -259,7 +267,7 @@ class CatalogueTest extends TestCase
             ->assertJsonPath('data.url', "/api/catalogue/{$dataset->id}/preview/raster");
 
         // Internal info still points to the internal route.
-        $this->getJson("/api/datasets/{$dataset->id}/preview/raster/info")
+        $this->actingAs($this->staff())->getJson("/api/datasets/{$dataset->id}/preview/raster/info")
             ->assertJsonPath('data.url', "/api/datasets/{$dataset->id}/preview/raster");
     }
 

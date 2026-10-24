@@ -2,13 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class DatasetPagesTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Internal endpoints require a signed-in account.
+        $this->actingAs(User::factory()->role('uploader')->create());
 
         $this->withoutVite();
     }
