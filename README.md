@@ -1,4 +1,4 @@
-# SoESIS WebGIS — Proof of Concept
+# SoESIS WebGIS
 
 Platform data spasial untuk mengunggah, memproses, dan meninjau dataset **Shapefile** dan **GeoTIFF**.
 Dataset diproses secara asinkron (antrean Redis), vektor diimpor ke **PostGIS**, raster dikonversi
