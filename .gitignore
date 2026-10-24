@@ -6,3 +6,18 @@
 .idea/
 Thumbs.db
 .DS_Store
+
+# Rewrite: backend (FastAPI)
+backend/.env
+backend/.venv/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Rewrite: frontend (Next.js)
+frontend/.env*.local
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/test-results/
+frontend/playwright-report/

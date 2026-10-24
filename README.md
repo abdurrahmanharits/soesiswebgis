@@ -1,5 +1,17 @@
 # SoESIS WebGIS
 
+> **Branch `rewrite/nextjs-fastapi` — rewrite ke Next.js + FastAPI sedang berjalan.**
+> Versi Laravel di bawah tetap berjalan (`api/`, port 8000) sebagai acuan perilaku sampai R7.
+>
+> | Bagian | Folder | Port | Dokumentasi |
+> |---|---|---|---|
+> | Backend FastAPI + worker Celery (GDAL 3.10, Python 3.12) | `backend/` | 127.0.0.1:8001 | [backend/README.md](backend/README.md) |
+> | Frontend Next.js 16 (di host) | `frontend/` | 127.0.0.1:3000 | [frontend/README.md](frontend/README.md) |
+> | Kontrak API (satu-satunya penghubung keduanya) | `contracts/openapi.json` | — | — |
+>
+> Milestone: **R0 fondasi ✓** → R0.5 auth → R1 ingest → R2 preview → R3 kurasi → R4 peta →
+> R5 katalog → R7 pembersihan Laravel. Fitur di bawah ini masih dilayani Laravel.
+
 Platform data spasial untuk mengunggah, memproses, dan meninjau dataset **Shapefile** dan **GeoTIFF**.
 Dataset diproses secara asinkron (antrean Redis), vektor diimpor ke **PostGIS**, raster dikonversi
 menjadi **Cloud Optimized GeoTIFF (COG)**, lalu dapat dipratinjau di peta **OpenLayers**.

@@ -87,6 +87,67 @@ services:
       retries: 20
       start_period: 5s
 
+  # ---- Rewrite (branch rewrite/nextjs-fastapi): FastAPI backend + Celery worker ----
+  # Laravel (app, worker) keeps running on :8000 as the behaviour reference until R7.
+
+  backend:
+    build:
+      context: ./backend
+    image: soesis-backend:local
+    init: true
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      # Reload by polling, limited to src/ (inotify does not cross the Windows bind mount).
+      WATCHFILES_FORCE_POLLING: "true"
+      SOESIS_CONTRACT_PATH: /contracts/openapi.json
+    command:
+      - uvicorn
+      - soesis.main:app
+      - "--host=0.0.0.0"
+      - "--port=8001"
+      - "--reload"
+      - "--reload-dir=/app/src"
+    volumes:
+      - ./backend:/app
+      - ./contracts:/contracts
+      # Shared with Laravel during the rewrite (decision 22).
+      - ./api/storage/app/private:/data/storage
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  backend-worker:
+    image: soesis-backend:local
+    init: true
+    restart: unless-stopped
+    env_file: ./backend/.env
+    command:
+      - celery
+      - "--app=soesis.worker"
+      - worker
+      - "--queues=spatial"
+      - "--concurrency=2"
+      - "--loglevel=INFO"
+    volumes:
+      - ./backend:/app
+      - ./api/storage/app/private:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
