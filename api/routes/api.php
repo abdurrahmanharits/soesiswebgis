@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\CatalogueController;
+use App\Http\Controllers\Api\CataloguePreviewController;
 use App\Http\Controllers\Api\DatasetController;
 use App\Http\Controllers\Api\DatasetCurationController;
 use App\Http\Controllers\Api\DatasetPreviewController;
@@ -36,4 +38,20 @@ Route::prefix('/datasets/{dataset}/curation')
         Route::post('/reject', 'reject')->name('reject')->missing($notFound);
         Route::post('/reopen', 'reopen')->name('reopen')->missing($notFound);
         Route::get('/history', 'history')->name('history')->missing($notFound);
+    });
+
+// Public catalogue: published (approved) datasets only; anything else is 404.
+Route::get('/catalogue', [CatalogueController::class, 'index'])->name('api.catalogue.index');
+Route::get('/catalogue/{dataset}', [CatalogueController::class, 'show'])->whereUuid('dataset')->name('api.catalogue.show');
+
+Route::prefix('/catalogue/{dataset}/preview')
+    ->whereUuid('dataset')
+    ->name('api.catalogue.preview.')
+    ->controller(CataloguePreviewController::class)
+    ->group(function () {
+        $notFound = fn () => response()->json(['message' => 'Dataset not found.'], 404);
+
+        Route::get('/vector', 'vector')->name('vector')->missing($notFound);
+        Route::get('/raster', 'raster')->name('raster')->missing($notFound);
+        Route::get('/raster/info', 'rasterInfo')->name('raster.info')->missing($notFound);
     });

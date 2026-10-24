@@ -3,7 +3,8 @@ import { get as getProjection, transformExtent } from 'ol/proj.js';
 import { register } from 'ol/proj/proj4.js';
 import GeoTIFF from 'ol/source/GeoTIFF.js';
 import proj4 from 'proj4';
-import { getRasterInfo } from '../datasets/api.js';
+import { DATASET_PREVIEW_BASE, getRasterInfo } from '../datasets/api.js';
+import { t } from '../i18n.js';
 import { RAMP } from './ramp.js';
 
 /**
@@ -37,8 +38,8 @@ function rampStyle({ minimum, maximum }, hasNodata) {
  * Range-enabled preview endpoint.
  * Resolves to { layer, source, extent (EPSG:4326 or null), notices, legend }.
  */
-export async function loadRasterLayer(dataset) {
-    const info = await getRasterInfo(dataset.id);
+export async function loadRasterLayer(dataset, { previewBase = DATASET_PREVIEW_BASE } = {}) {
+    const info = await getRasterInfo(dataset.id, previewBase);
 
     ensureProjection(info.srid, info.proj4);
 
@@ -67,12 +68,12 @@ export async function loadRasterLayer(dataset) {
             const view = await source.getView();
             extent = transformExtent(view.extent, view.projection, 'EPSG:4326');
         } catch {
-            notices.push('Raster loaded, but dataset extent is unavailable.');
+            notices.push(t('Raster loaded, but dataset extent is unavailable.'));
         }
     }
 
     if (!statistics) {
-        notices.push('Value statistics unavailable. Showing grayscale.');
+        notices.push(t('Value statistics unavailable. Showing grayscale.'));
     }
 
     return {

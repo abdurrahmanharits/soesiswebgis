@@ -12,6 +12,11 @@ menjadi **Cloud Optimized GeoTIFF (COG)**, lalu dapat dipratinjau di peta **Open
 - Halaman detail dengan metadata (CRS, geometri, atribut, ukuran raster, NoData, dll.)
 - Pratinjau peta: vektor dari PostGIS (GeoJSON), raster COG via HTTP Range, basemap OSM/Imagery,
   popup atribut, kontrol visibilitas dan opacity, legenda raster
+- Kurasi metadata (ISO 19115-lite) dengan approve/reject/reopen dan riwayat
+- Peta multi-layer (`/map`) dengan state di URL
+- **Katalog publik** (`/catalogue`, bahasa Indonesia): hanya dataset yang disetujui, dengan pencarian,
+  filter, urutan, halaman, thumbnail cakupan, halaman detail metadata + atribusi, dan peta publik
+  (`/catalogue/map`). Dataset yang di-reopen/ditolak langsung hilang dari katalog (404).
 
 ## Stack
 
@@ -108,8 +113,11 @@ api/                        aplikasi Laravel
   app/Jobs/ProcessSpatialDataset.php          pipeline ingestion Shapefile/GeoTIFF
   app/Http/Controllers/Api/DatasetController.php         daftar, detail, upload
   app/Http/Controllers/Api/DatasetPreviewController.php  endpoint pratinjau peta
-  resources/views/datasets/                   halaman daftar & detail
+  app/Support/CatalogueDataset.php            whitelist field publik + query dataset approved
+  resources/views/datasets/                   halaman daftar & detail (internal)
+  resources/views/catalogue/                  katalog publik (bahasa Indonesia, lang/id.json)
   resources/js/datasets/                      logika halaman (API, upload, polling)
+  resources/js/catalogue/                     katalog publik (filter client-side, thumbnail)
   resources/js/map/                           peta OpenLayers (lazy-loaded)
   storage/app/private/                        file upload, file kerja, dan COG hasil proses
 ```
@@ -124,6 +132,15 @@ api/                        aplikasi Laravel
 | GET | `/api/datasets/{id}/preview/vector` | GeoJSON (EPSG:4326), maks. 10.000 fitur |
 | GET | `/api/datasets/{id}/preview/raster` | File COG, mendukung HTTP Range |
 | GET | `/api/datasets/{id}/preview/raster/info` | CRS, extent, NoData, statistik band |
+| PATCH/POST | `/api/datasets/{id}/curation[/approve\|/reject\|/reopen]` | Kurasi metadata dan status |
+| GET | `/api/datasets/{id}/curation/history` | Riwayat kurasi |
+| GET | `/api/map/layers` | Daftar layer untuk `/map` (approved + pending) |
+| GET | `/api/catalogue` | Katalog publik: semua dataset approved, field publik saja |
+| GET | `/api/catalogue/{id}` | Detail publik (404 jika belum/tidak lagi approved) |
+| GET | `/api/catalogue/{id}/preview/{vector,raster,raster/info}` | Pratinjau publik, khusus approved |
+
+Area internal (`/datasets`, `/map`, `/api/datasets/*`) belum diproteksi login. Aplikasi hanya
+mendengarkan di `127.0.0.1`, jadi jangan buka port ke jaringan sebelum ada proteksi.
 
 ## Catatan lingkungan pengembangan
 

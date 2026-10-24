@@ -1,6 +1,7 @@
 import { fromLonLat, toLonLat } from 'ol/proj.js';
-import { listMapLayers } from '../datasets/api.js';
+import { DATASET_PREVIEW_BASE, listCatalogue, listMapLayers } from '../datasets/api.js';
 import { escapeHtml, formatBadge, statusBadge, LIFECYCLE } from '../datasets/format.js';
+import { formatCount, t } from '../i18n.js';
 import { showToast } from '../ui/toast.js';
 import { DEFAULT_EXTENT, createMap, fitExtents } from './core.js';
 import { createInspector } from './inspect.js';
@@ -12,6 +13,15 @@ export const MAX_LAYERS = 8;
 export const MAX_RASTER_LAYERS = 3;
 
 const RASTER_LIMIT_MESSAGE = 'Raster layer limit reached. Disable or remove another raster layer first.';
+
+/**
+ * Where the page gets its layers: the internal /map (approved + pending) or the
+ * public /catalogue/map (published datasets only, through the public preview endpoints).
+ */
+const SOURCES = {
+    internal: { listLayers: listMapLayers, previewBase: DATASET_PREVIEW_BASE },
+    catalogue: { listLayers: listCatalogue, previewBase: '/api/catalogue' },
+};
 
 // Deterministic per dataset id, so a layer keeps its colour across reloads and shared links.
 const PALETTE = [
@@ -46,10 +56,12 @@ function readUrlState() {
 
 function summary(item) {
     if (isRaster(item)) {
-        return item.band_count ? `${item.band_count} ${item.band_count === 1 ? 'band' : 'bands'}` : '';
+        return item.band_count ? (item.band_count === 1 ? t('1 band') : t('{count} bands', { count: item.band_count })) : '';
     }
 
-    return [item.geometry_type, item.feature_count == null ? null : `${Number(item.feature_count).toLocaleString('en-US')} features`]
+    const features = Number(item.feature_count) === 1 ? t('1 feature') : t('{count} features', { count: formatCount(item.feature_count) });
+
+    return [item.geometry_type, item.feature_count == null ? null : features]
         .filter(Boolean)
         .join(' · ');
 }
@@ -60,8 +72,11 @@ const pendingBadge = (item) => (item.curation_status === 'pending' ? statusBadge
  * /map: catalogue of approved + pending datasets, active layer stack
  * (visibility, opacity, order, zoom, remove), shared inspector popup and
  * URL state (?layers=top,…,bottom&basemap=&x=&y=&z=).
+ * source: 'internal' (/map) or 'catalogue' (/catalogue/map, published only).
  */
-export function initMapPage() {
+export function initMapPage({ source = 'internal' } = {}) {
+    const { listLayers, previewBase } = SOURCES[source] ?? SOURCES.internal;
+
     const ui = {
         panel: $('map-panel'),
         panelOpen: $('map-panel-open'),
@@ -134,10 +149,10 @@ export function initMapPage() {
     }
 
     function canAdd(item) {
-        if (entries.some((e) => e.item.id === item.id)) return { ok: false, reason: 'Already on the map.' };
-        if (entries.length >= MAX_LAYERS) return { ok: false, reason: `Layer limit reached (${MAX_LAYERS}). Remove a layer first.` };
+        if (entries.some((e) => e.item.id === item.id)) return { ok: false, reason: t('Already on the map.') };
+        if (entries.length >= MAX_LAYERS) return { ok: false, reason: t('Layer limit reached ({max}). Remove a layer first.', { max: MAX_LAYERS }) };
         if (isRaster(item) && entries.filter((e) => isRaster(e.item)).length >= MAX_RASTER_LAYERS) {
-            return { ok: false, reason: RASTER_LIMIT_MESSAGE };
+            return { ok: false, reason: t(RASTER_LIMIT_MESSAGE) };
         }
 
         return { ok: true };
@@ -187,8 +202,8 @@ export function initMapPage() {
 
         try {
             const result = isRaster(entry.item)
-                ? await import('./raster.js').then((m) => m.loadRasterLayer(entry.item))
-                : await loadVectorLayer(entry.item, { projection: map.getView().getProjection(), color: entry.color });
+                ? await import('./raster.js').then((m) => m.loadRasterLayer(entry.item, { previewBase }))
+                : await loadVectorLayer(entry.item, { projection: map.getView().getProjection(), color: entry.color, previewBase });
 
             // Removed while loading.
             if (!entries.includes(entry)) return;
@@ -211,7 +226,7 @@ export function initMapPage() {
             entry.source?.on('change', () => {
                 if (entry.source.getState() === 'error') {
                     entry.status = 'error';
-                    entry.message = entry.source.getError()?.message || 'Raster could not be loaded.';
+                    entry.message = entry.source.getError()?.message || t('Raster could not be loaded.');
                     render();
                 }
             });
@@ -220,7 +235,7 @@ export function initMapPage() {
         } catch (error) {
             if (!entries.includes(entry)) return;
             entry.status = 'error';
-            entry.message = error.message || 'Layer could not be loaded.';
+            entry.message = error.message || t('Layer could not be loaded.');
         }
 
         render();
@@ -257,12 +272,12 @@ export function initMapPage() {
     }
 
     function zoomTo(entry) {
-        if (!fitExtents(map, [entry.extent])) showToast('Extent of this layer is unknown.', 'info');
+        if (!fitExtents(map, [entry.extent])) showToast(t('Extent of this layer is unknown.'), 'info');
     }
 
     function fitActive() {
         const extents = entries.filter((e) => e.visible && e.status === 'ready').map((e) => e.extent);
-        if (!fitExtents(map, extents)) showToast('No visible layers with a known extent.', 'info');
+        if (!fitExtents(map, extents)) showToast(t('No visible layers with a known extent.'), 'info');
     }
 
     // ---- Rendering -------------------------------------------------------
@@ -279,10 +294,10 @@ export function initMapPage() {
 
         let status = '';
         if (entry.status === 'loading') {
-            status = '<p class="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><span class="size-3 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" aria-hidden="true"></span>Loading…</p>';
+            status = `<p class="mt-1 flex items-center gap-1.5 text-xs text-slate-500"><span class="size-3 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" aria-hidden="true"></span>${t('Loading…')}</p>`;
         } else if (entry.status === 'error') {
-            status = `<p class="mt-1 text-xs text-rose-700">Failed to load: ${escapeHtml(entry.message)}</p>
-                <button type="button" data-action="retry" class="mt-1 text-xs font-medium text-slate-700 underline">Retry</button>`;
+            status = `<p class="mt-1 text-xs text-rose-700">${escapeHtml(t('Failed to load: {message}', { message: entry.message }))}</p>
+                <button type="button" data-action="retry" class="mt-1 text-xs font-medium text-slate-700 underline">${t('Retry')}</button>`;
         } else if (entry.notices.length) {
             status = entry.notices.map((n) => `<p class="mt-1 text-xs text-amber-800">${escapeHtml(n)}</p>`).join('');
         }
@@ -292,7 +307,7 @@ export function initMapPage() {
             const { gradient, min, max } = legendParts(entry.legend);
             legend = `<div class="mt-2">
                 <div class="h-2 rounded-sm ring-1 ring-slate-200" style="background: ${gradient}"></div>
-                <div class="mt-0.5 flex justify-between text-[11px] text-slate-500 tabular-nums"><span>${min}</span><span>Value (band 1)</span><span>${max}</span></div>
+                <div class="mt-0.5 flex justify-between text-[11px] text-slate-500 tabular-nums"><span>${min}</span><span>${t('Value (band 1)')}</span><span>${max}</span></div>
             </div>`;
         }
 
@@ -300,7 +315,7 @@ export function initMapPage() {
 
         return `<li data-index="${index}" class="rounded-md p-2 ring-1 ring-slate-200 ${entry.status === 'error' ? 'bg-rose-50/50' : 'bg-white'}">
             <div class="flex items-start gap-2">
-                <input type="checkbox" data-action="visible" ${entry.visible ? 'checked' : ''} class="mt-0.5 size-4 shrink-0 accent-emerald-700" aria-label="Show ${escapeHtml(item.title)}">
+                <input type="checkbox" data-action="visible" ${entry.visible ? 'checked' : ''} class="mt-0.5 size-4 shrink-0 accent-emerald-700" aria-label="${escapeHtml(t('Show {title}', { title: item.title }))}">
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5">${swatch}<p class="truncate text-sm font-medium text-slate-900" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</p></div>
                     <div class="mt-1 flex flex-wrap items-center gap-1">${formatBadge(item.format)} ${pendingBadge(item)}</div>
@@ -309,14 +324,14 @@ export function initMapPage() {
             </div>
             <div class="mt-2 flex items-center gap-1">
                 <label class="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-slate-500">
-                    <span class="sr-only">Opacity</span>
+                    <span class="sr-only">${t('Opacity')}</span>
                     <input type="range" data-action="opacity" min="0" max="100" step="5" value="${opacity}" class="min-w-0 flex-1 accent-emerald-700">
                     <span data-opacity-value class="w-8 tabular-nums">${opacity}%</span>
                 </label>
-                ${iconButton('up', 'Move up', '↑', index === 0)}
-                ${iconButton('down', 'Move down', '↓', index === entries.length - 1)}
-                ${iconButton('zoom', 'Zoom to layer', '⤢', !entry.extent)}
-                ${iconButton('remove', 'Remove layer', '✕')}
+                ${iconButton('up', t('Move up'), '↑', index === 0)}
+                ${iconButton('down', t('Move down'), '↓', index === entries.length - 1)}
+                ${iconButton('zoom', t('Zoom to layer'), '⤢', !entry.extent)}
+                ${iconButton('remove', t('Remove layer'), '✕')}
             </div>
             ${legend}
         </li>`;
@@ -343,7 +358,7 @@ export function initMapPage() {
                 </div>
                 <button type="button" data-action="add" ${check.ok ? '' : `disabled title="${escapeHtml(check.reason)}"`}
                         class="shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${active ? 'text-slate-400' : 'text-emerald-700 ring-1 ring-emerald-200 ring-inset hover:bg-emerald-50'} disabled:cursor-not-allowed disabled:opacity-60">
-                    ${active ? 'Added' : 'Add'}
+                    ${active ? t('Added') : t('Add')}
                 </button>
             </li>`;
         }).join('');
@@ -352,7 +367,7 @@ export function initMapPage() {
     function render() {
         ui.active.innerHTML = entries.map(renderEntry).join('');
         ui.activeEmpty.hidden = entries.length > 0;
-        ui.count.textContent = `${entries.length} of ${MAX_LAYERS} active`;
+        ui.count.textContent = t('{count} of {max} active', { count: entries.length, max: MAX_LAYERS });
         ui.fit.disabled = !entries.some((e) => e.status === 'ready' && e.extent);
         renderCatalogue();
     }
@@ -422,7 +437,7 @@ export function initMapPage() {
         ui.catalogueError.hidden = true;
 
         try {
-            catalogue = await listMapLayers();
+            catalogue = await listLayers();
         } catch (error) {
             ui.catalogueError.hidden = false;
             ui.catalogueError.querySelector('[data-message]').textContent = error.message;
@@ -445,7 +460,9 @@ export function initMapPage() {
             items.forEach((item) => addLayer(item, { fit: false, append: true }));
 
             if (missing > 0) {
-                showToast(`${missing} layer${missing === 1 ? ' is' : 's are'} not available on the map.`, 'info');
+                showToast(missing === 1
+                    ? t('1 layer is not available on the map.')
+                    : t('{count} layers are not available on the map.', { count: missing }), 'info');
             }
 
             if (!hasView) fitExtents(map, items.map((item) => item.extent));

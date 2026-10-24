@@ -1,4 +1,5 @@
 import Overlay from 'ol/Overlay.js';
+import { t } from '../i18n.js';
 
 function attributeList(properties) {
     const entries = Object.entries(properties);
@@ -6,7 +7,7 @@ function attributeList(properties) {
     if (entries.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'text-slate-500';
-        empty.textContent = 'No attributes available.';
+        empty.textContent = t('No attributes available.');
         return empty;
     }
 

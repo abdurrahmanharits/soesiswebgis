@@ -141,7 +141,7 @@ class DatasetPreviewController extends Controller
 
         return response()->json([
             'data' => [
-                'url' => route('api.datasets.preview.raster', $dataset, absolute: false),
+                'url' => $this->rasterUrl($dataset),
                 'crs' => $dataset->crs,
                 'srid' => $dataset->srid,
                 'proj4' => trim($proj4),
@@ -153,7 +153,7 @@ class DatasetPreviewController extends Controller
         ]);
     }
 
-    private function ensurePreviewable(Dataset $dataset, string $format): void
+    protected function ensurePreviewable(Dataset $dataset, string $format): void
     {
         if ($dataset->format !== $format) {
             $this->fail(422, "This preview is only available for {$format} datasets.");
@@ -162,6 +162,12 @@ class DatasetPreviewController extends Controller
         if ($dataset->status !== 'ready_for_curation') {
             $this->fail(409, 'Dataset is not ready for preview.');
         }
+    }
+
+    /** Where the client fetches the COG; subclasses point it at their own raster route. */
+    protected function rasterUrl(Dataset $dataset): string
+    {
+        return route('api.datasets.preview.raster', $dataset, absolute: false);
     }
 
     private function rasterPath(Dataset $dataset): string
@@ -223,7 +229,7 @@ class DatasetPreviewController extends Controller
         return $statistics;
     }
 
-    private function fail(int $status, string $message): never
+    protected function fail(int $status, string $message): never
     {
         throw new HttpResponseException(response()->json(['message' => $message], $status));
     }

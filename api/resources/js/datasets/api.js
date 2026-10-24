@@ -2,6 +2,11 @@
  * Thin client for the existing dataset API (routes/api.php).
  */
 
+import { t } from '../i18n.js';
+
+/** Internal preview endpoints; the public catalogue passes '/api/catalogue'. */
+export const DATASET_PREVIEW_BASE = '/api/datasets';
+
 export class ApiError extends Error {
     constructor(message, { status = 0, errors = null } = {}) {
         super(message);
@@ -24,14 +29,14 @@ async function requestJson(url, { method = 'GET', body } = {}) {
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch {
-        throw new ApiError('Cannot reach the server. Check that the backend is running.');
+        throw new ApiError(t('Cannot reach the server. Check that the backend is running.'));
     }
 
     const json = await response.json().catch(() => null);
 
     if (!response.ok) {
         throw new ApiError(
-            json?.message || `Request failed (HTTP ${response.status}).`,
+            json?.message ? t(json.message) : t('Request failed (HTTP {status}).', { status: response.status }),
             { status: response.status, errors: json?.errors ?? null },
         );
     }
@@ -78,14 +83,21 @@ export async function listMapLayers() {
     return body?.data ?? [];
 }
 
+/** Public catalogue: every published dataset (search/filter happen client-side). */
+export async function listCatalogue() {
+    const body = await getJson('/api/catalogue');
+
+    return body?.data ?? [];
+}
+
 /** GeoJSON FeatureCollection (EPSG:4326) with `bbox` and `preview` {limit, total, truncated}. */
-export function getVectorPreview(id) {
-    return getJson(`/api/datasets/${encodeURIComponent(id)}/preview/vector`);
+export function getVectorPreview(id, base = DATASET_PREVIEW_BASE) {
+    return getJson(`${base}/${encodeURIComponent(id)}/preview/vector`);
 }
 
 /** COG url, CRS (srid + proj4), WGS84 extent, nodata and approximate band statistics. */
-export async function getRasterInfo(id) {
-    const body = await getJson(`/api/datasets/${encodeURIComponent(id)}/preview/raster/info`);
+export async function getRasterInfo(id, base = DATASET_PREVIEW_BASE) {
+    const body = await getJson(`${base}/${encodeURIComponent(id)}/preview/raster/info`);
 
     return body?.data ?? null;
 }

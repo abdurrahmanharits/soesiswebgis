@@ -3,7 +3,8 @@ import VectorLayer from 'ol/layer/Vector.js';
 import { transformExtent } from 'ol/proj.js';
 import VectorSource from 'ol/source/Vector.js';
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
-import { getVectorPreview } from '../datasets/api.js';
+import { DATASET_PREVIEW_BASE, getVectorPreview } from '../datasets/api.js';
+import { formatCount, t } from '../i18n.js';
 
 export const DEFAULT_COLOR = [4, 120, 87];
 
@@ -30,8 +31,8 @@ export const SELECTED_STYLE = style('rgba(245, 158, 11, 0.3)', '#b45309', 3);
  * Fetches the GeoJSON preview and builds a vector layer (not added to a map).
  * Resolves to { layer, extent (EPSG:4326 or null), notices }.
  */
-export async function loadVectorLayer(dataset, { projection = 'EPSG:3857', color = DEFAULT_COLOR } = {}) {
-    const collection = await getVectorPreview(dataset.id);
+export async function loadVectorLayer(dataset, { projection = 'EPSG:3857', color = DEFAULT_COLOR, previewBase = DATASET_PREVIEW_BASE } = {}) {
+    const collection = await getVectorPreview(dataset.id, previewBase);
 
     const features = new GeoJSON().readFeatures(collection, {
         dataProjection: 'EPSG:4326',
@@ -45,9 +46,9 @@ export async function loadVectorLayer(dataset, { projection = 'EPSG:3857', color
     const { preview } = collection;
 
     if (features.length === 0) {
-        notices.push('No features available for preview.');
+        notices.push(t('No features available for preview.'));
     } else if (preview?.truncated) {
-        notices.push(`Preview shows the first ${preview.limit.toLocaleString('en-US')} of ${preview.total.toLocaleString('en-US')} features.`);
+        notices.push(t('Preview shows the first {limit} of {total} features.', { limit: formatCount(preview.limit), total: formatCount(preview.total) }));
     }
 
     let extent = Array.isArray(collection.bbox) ? collection.bbox : null;

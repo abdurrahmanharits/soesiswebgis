@@ -40,6 +40,10 @@
                        @if (request()->routeIs('map.*')) aria-current="page" @endif>
                         Map
                     </a>
+                    {{-- The public area (Indonesian, published datasets only). --}}
+                    <a href="{{ route('catalogue.index') }}" class="rounded-md px-3 py-2 font-medium text-slate-600 hover:text-slate-900">
+                        Catalogue
+                    </a>
                 </nav>
             </div>
         </header>

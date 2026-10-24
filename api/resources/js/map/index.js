@@ -1,3 +1,5 @@
+import { DATASET_PREVIEW_BASE } from '../datasets/api.js';
+import { t } from '../i18n.js';
 import { createMap, fitExtents } from './core.js';
 import { legendParts } from './legend.js';
 
@@ -29,10 +31,11 @@ function renderNotices(element, notices) {
 }
 
 /**
- * Single-dataset preview inside the static markup of datasets/show.blade.php.
+ * Single-dataset preview inside the static markup of datasets/partials/preview.blade.php.
  * Called once per page, after the dataset reaches ready_for_curation.
+ * The public catalogue passes previewBase '/api/catalogue' (published datasets only).
  */
-export async function initDatasetPreview(dataset) {
+export async function initDatasetPreview(dataset, { previewBase = DATASET_PREVIEW_BASE } = {}) {
     const ui = {
         map: $('preview-map'),
         loading: $('preview-loading'),
@@ -52,7 +55,7 @@ export async function initDatasetPreview(dataset) {
     function showError(message) {
         ui.loading.hidden = true;
         ui.error.hidden = false;
-        ui.error.querySelector('[data-message]').textContent = message || 'Preview could not be loaded.';
+        ui.error.querySelector('[data-message]').textContent = message || t('Preview could not be loaded.');
     }
 
     ui.loading.hidden = false;
@@ -64,11 +67,11 @@ export async function initDatasetPreview(dataset) {
         // Loaded per format so vector pages don't pull in the GeoTIFF decoder.
         if (dataset.format === 'geotiff') {
             const { loadRasterLayer } = await import('./raster.js');
-            result = await loadRasterLayer(dataset);
+            result = await loadRasterLayer(dataset, { previewBase });
             map.addLayer(result.layer);
         } else {
             const [{ loadVectorLayer }, { createInspector }] = await Promise.all([import('./vector.js'), import('./inspect.js')]);
-            result = await loadVectorLayer(dataset, { projection: map.getView().getProjection() });
+            result = await loadVectorLayer(dataset, { projection: map.getView().getProjection(), previewBase });
             map.addLayer(result.layer);
             createInspector(map, ui.popup, { describe: (layer) => (layer === result.layer ? { title: null } : null) });
         }
@@ -99,7 +102,7 @@ export async function initDatasetPreview(dataset) {
         // COG tiles arrive through several Range requests; surface a failed source.
         result.source.on('change', () => {
             if (result.source.getState() === 'error') {
-                showError(`Preview could not be loaded. ${result.source.getError()?.message ?? ''}`.trim());
+                showError(`${t('Preview could not be loaded.')} ${result.source.getError()?.message ?? ''}`.trim());
             }
         });
     }

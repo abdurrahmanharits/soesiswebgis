@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { createPopup } from './popup.js';
 import { SELECTED_STYLE } from './vector.js';
 
@@ -47,7 +48,7 @@ export function createInspector(map, popupElement, { describe }) {
         const sections = hits.map(({ feature, info }) => {
             const { geometry, ...properties } = feature.getProperties();
             const id = feature.getId();
-            const featureLabel = id === undefined ? 'Feature' : `Feature ${id}`;
+            const featureLabel = id === undefined ? t('Feature') : t('Feature {id}', { id });
 
             return {
                 heading: info.title ? `${info.title} · ${featureLabel}` : (hits.length > 1 ? featureLabel : null),
@@ -58,11 +59,11 @@ export function createInspector(map, popupElement, { describe }) {
         const first = hits[0];
         const firstId = first.feature.getId();
         const title = hits.length > 1
-            ? `${hits.length} features`
-            : (first.info.title ?? (firstId === undefined ? 'Feature' : `Feature ${firstId}`));
+            ? t('{count} features', { count: hits.length })
+            : (first.info.title ?? (firstId === undefined ? t('Feature') : t('Feature {id}', { id: firstId })));
 
         if (hits.length === 1 && first.info.title) {
-            sections[0].heading = firstId === undefined ? null : `Feature ${firstId}`;
+            sections[0].heading = firstId === undefined ? null : t('Feature {id}', { id: firstId });
         }
 
         popup.open(event.coordinate, title, sections);
