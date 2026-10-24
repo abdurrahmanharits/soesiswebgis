@@ -1,24 +1,36 @@
 """Baseline schema, PostGIS capability and the privileges of the runtime role soesis_app."""
 
+import os
+
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
+
+from tests.conftest import BACKEND_ROOT
 
 pytestmark = pytest.mark.integration
 
 
-def test_baseline_revision_is_applied(app_engine):
+def test_database_is_at_the_latest_revision(app_engine):
+    script = ScriptDirectory.from_config(Config(os.path.join(BACKEND_ROOT, "alembic.ini")))
+
     with app_engine.connect() as connection:
-        assert connection.execute(text("select version_num from alembic_version")).scalar() == "0001_baseline"
+        assert connection.execute(text("select version_num from alembic_version")).scalar() == script.get_current_head()
 
 
 def test_baseline_creates_the_application_tables(app_engine):
     with app_engine.connect() as connection:
-        columns = dict(connection.execute(text(
-            "select table_name, count(*) from information_schema.columns where table_schema = 'public' "
-            "and table_name in ('datasets', 'dataset_curation_events', 'users', 'organizations') "
-            "group by table_name"
-        )).all())
+        columns = dict(
+            connection.execute(
+                text(
+                    "select table_name, count(*) from information_schema.columns where table_schema = 'public' "
+                    "and table_name in ('datasets', 'dataset_curation_events', 'users', 'organizations') "
+                    "group by table_name"
+                )
+            ).all()
+        )
 
     # Same column counts as the Laravel schema (pg_dump of the development database).
     assert columns == {"datasets": 42, "dataset_curation_events": 10, "users": 12, "organizations": 4}
@@ -26,11 +38,13 @@ def test_baseline_creates_the_application_tables(app_engine):
 
 def test_postgis_reprojects_and_serialises_geojson(app_engine):
     with app_engine.connect() as connection:
-        row = connection.execute(text(
-            "select postgis_lib_version() as version, "
-            "ST_AsGeoJSON(ST_Transform(ST_SetSRID(ST_MakePoint(96.25, 4.15), 4326), 3857), 0) as geojson, "
-            "(select count(*) from spatial_ref_sys where srid in (4326, 3857, 32750)) as known"
-        )).one()
+        row = connection.execute(
+            text(
+                "select postgis_lib_version() as version, "
+                "ST_AsGeoJSON(ST_Transform(ST_SetSRID(ST_MakePoint(96.25, 4.15), 4326), 3857), 0) as geojson, "
+                "(select count(*) from spatial_ref_sys where srid in (4326, 3857, 32750)) as known"
+            )
+        ).one()
 
     assert row.version.startswith("3.4")
     assert '"Point"' in row.geojson

@@ -9,7 +9,7 @@
 > | Frontend Next.js 16 (di host) | `frontend/` | 127.0.0.1:3000 | [frontend/README.md](frontend/README.md) |
 > | Kontrak API (satu-satunya penghubung keduanya) | `contracts/openapi.json` | — | — |
 >
-> Milestone: **R0 fondasi ✓** → R0.5 auth → R1 ingest → R2 preview → R3 kurasi → R4 peta →
+> Milestone: **R0 fondasi ✓** → **R0.5 auth (JWT, role, admin) ✓** → R1 ingest → R2 preview → R3 kurasi → R4 peta →
 > R5 katalog → R7 pembersihan Laravel. Fitur di bawah ini masih dilayani Laravel.
 
 Platform data spasial untuk mengunggah, memproses, dan meninjau dataset **Shapefile** dan **GeoTIFF**.

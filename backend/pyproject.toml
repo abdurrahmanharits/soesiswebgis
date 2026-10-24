@@ -15,6 +15,9 @@ dependencies = [
     "alembic>=1.14",
     "redis>=5.2",
     "celery[redis]>=5.4",
+    "pyjwt>=2.10",
+    "bcrypt>=4.2",
+    "typer>=0.15",
 ]
 
 [dependency-groups]
@@ -25,9 +28,17 @@ dev = [
     "ruff>=0.8",
 ]
 
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/soesis"]
+
 [tool.uv]
-# Application, not a distributable package: code runs from src/ (PYTHONPATH).
-package = false
+# Installed editable into the venv, so `uv run uvicorn soesis.main:app` / `python -m soesis.cli`
+# work from backend/ without PYTHONPATH. (The Docker image sets PYTHONPATH=/app/src instead.)
+package = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -54,7 +65,7 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Module layers: api | infrastructure -> application -> domain"
 type = "layers"
-containers = ["soesis.modules.system"]
+containers = ["soesis.modules.system", "soesis.modules.identity"]
 layers = ["api | infrastructure", "application", "domain"]
 
 # The core stays framework- and database-free.
@@ -76,4 +87,11 @@ forbidden_modules = [
 name = "shared and spatial do not depend on modules"
 type = "forbidden"
 source_modules = ["soesis.shared", "soesis.spatial"]
-forbidden_modules = ["soesis.modules", "soesis.main", "soesis.worker"]
+forbidden_modules = ["soesis.modules", "soesis.main", "soesis.worker", "soesis.composition", "soesis.cli"]
+
+# Modules talk to each other only through what they expose deliberately; system and
+# identity never import each other (later modules may use identity.api/domain policy).
+[[tool.importlinter.contracts]]
+name = "Modules are independent"
+type = "independence"
+modules = ["soesis.modules.system", "soesis.modules.identity"]

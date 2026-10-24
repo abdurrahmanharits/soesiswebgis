@@ -17,20 +17,24 @@ class FakeProbe:
 
 
 def test_ready_when_every_component_is_healthy():
-    report = CheckReadiness([
-        FakeProbe("database", ComponentStatus.ok("database", postgis="3.4.3")),
-        FakeProbe("redis", ComponentStatus.ok("redis")),
-    ]).execute()
+    report = CheckReadiness(
+        [
+            FakeProbe("database", ComponentStatus.ok("database", postgis="3.4.3")),
+            FakeProbe("redis", ComponentStatus.ok("redis")),
+        ]
+    ).execute()
 
     assert report.ready
     assert [c.name for c in report.components] == ["database", "redis"]
 
 
 def test_not_ready_when_one_component_fails():
-    report = CheckReadiness([
-        FakeProbe("database", ComponentStatus.ok("database")),
-        FakeProbe("redis", ComponentStatus.failed("redis", "connection refused")),
-    ]).execute()
+    report = CheckReadiness(
+        [
+            FakeProbe("database", ComponentStatus.ok("database")),
+            FakeProbe("redis", ComponentStatus.failed("redis", "connection refused")),
+        ]
+    ).execute()
 
     assert not report.ready
 

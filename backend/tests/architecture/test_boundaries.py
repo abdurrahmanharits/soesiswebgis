@@ -17,7 +17,10 @@ def test_import_contracts_hold():
     assert lint_imports, "import-linter is not installed (dev dependency)"
 
     result = subprocess.run(
-        [lint_imports], cwd=BACKEND_ROOT, capture_output=True, text=True,
+        [lint_imports],
+        cwd=BACKEND_ROOT,
+        capture_output=True,
+        text=True,
         env={**os.environ, "PYTHONPATH": str(BACKEND_ROOT / "src")},
     )
 

@@ -8,13 +8,21 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine
+from redis import Redis
+from sqlalchemy import Engine, create_engine, text
 
 from soesis.main import create_app
 from soesis.shared.config import Settings
 
 BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_DATABASE = "soesis_pytest"
+# Login throttling of the tests lives in its own Redis DB (dev uses 3).
+TEST_RATE_LIMIT_REDIS = "redis://redis:6379/4"
+ORIGIN = "http://127.0.0.1:3000"
+
+# A real hash produced by Laravel (PHP password_hash, cost 12) for this password.
+LARAVEL_PASSWORD = "Laravel-Compat-123"
+LARAVEL_HASH = "$2y$12$5t3l.e/4z/aE29g9oPRzDukaKp7E1BmeQxJr8zi73votzX7UcG7ru"
 
 
 def _required_env(name: str) -> str:
@@ -55,6 +63,9 @@ def settings(migrated_database: str) -> Settings:
         env="test",
         database_url=migrated_database,
         redis_url=os.environ.get("SOESIS_REDIS_URL", "redis://redis:6379/2"),
+        rate_limit_redis_url=TEST_RATE_LIMIT_REDIS,
+        jwt_secret="test-only-secret-that-is-long-enough-for-hs256",
+        allowed_origins=[ORIGIN],
     )
 
 
@@ -67,6 +78,22 @@ def app_engine(migrated_database: str) -> Iterator[Engine]:
 
 
 @pytest.fixture
+def clean_identity(app_engine: Engine) -> Iterator[None]:
+    """Empty account tables and login throttling before and after a test (soesis_pytest only)."""
+
+    def wipe() -> None:
+        with app_engine.begin() as connection:
+            for table in ("auth_refresh_tokens", "dataset_curation_events", "datasets", "users", "organizations"):
+                connection.execute(text(f"delete from {table}"))
+        Redis.from_url(TEST_RATE_LIMIT_REDIS).flushdb()
+
+    wipe()
+    yield
+    wipe()
+
+
+@pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(settings)) as test_client:
+    # Browsers send Origin on POST/PATCH/DELETE; the CSRF check requires it with cookies.
+    with TestClient(create_app(settings), headers={"Origin": ORIGIN}) as test_client:
         yield test_client

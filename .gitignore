@@ -9,6 +9,7 @@ Thumbs.db
 
 # Rewrite: backend (FastAPI)
 backend/.env
+backend/.env.local
 backend/.venv/
 **/__pycache__/
 .pytest_cache/

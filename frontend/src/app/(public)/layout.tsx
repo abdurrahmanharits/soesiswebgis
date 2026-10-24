@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { PublicAccountLink } from "@/shared/session/public-account-link";
 import { Brand } from "@/shared/ui/brand";
 
 import { instrumentSans } from "../fonts";
@@ -18,6 +19,7 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8">
             <Brand href="/" subtitle="Katalog Data Spasial" />
+            <PublicAccountLink />
           </div>
         </header>
         {children}

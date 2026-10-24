@@ -19,6 +19,8 @@ const architecture = {
       { type: "shared-api", pattern: "src/shared/api" },
       { type: "shared-ui", pattern: "src/shared/ui" },
       { type: "shared-map", pattern: "src/shared/map" },
+      // Signed-in account for the internal area (header, banner, role gate); used across features.
+      { type: "shared-session", pattern: "src/shared/session" },
     ],
     "import/resolver": { typescript: { alwaysTryTypes: true } },
   },
@@ -27,16 +29,17 @@ const architecture = {
       default: "disallow",
       policies: [
         // Routing/layout only: pages compose feature UI and shared UI.
-        { from: { element: { type: "app" } }, allow: { to: { element: { types: { anyOf: ["feature-ui", "shared-ui"] } } } } },
+        { from: { element: { type: "app" } }, allow: { to: { element: { types: { anyOf: ["feature-ui", "shared-ui", "shared-session"] } } } } },
         // UI may use its own feature's hooks/services (server components call services directly).
         { from: { element: { type: "feature-ui" } }, allow: { to: { element: { types: { anyOf: ["feature-ui", "feature-hooks", "feature-services"] }, captured: sameFeature } } } },
-        { from: { element: { type: "feature-ui" } }, allow: { to: { element: { types: { anyOf: ["shared-ui", "shared-map"] } } } } },
+        { from: { element: { type: "feature-ui" } }, allow: { to: { element: { types: { anyOf: ["shared-ui", "shared-map", "shared-session"] } } } } },
         { from: { element: { type: "feature-hooks" } }, allow: { to: { element: { types: { anyOf: ["feature-hooks", "feature-services"] }, captured: sameFeature } } } },
         { from: { element: { type: "feature-services" } }, allow: { to: { element: { type: "feature-services", captured: sameFeature } } } },
         { from: { element: { type: "feature-services" } }, allow: { to: { element: { type: "shared-api" } } } },
         { from: { element: { type: "shared-api" } }, allow: { to: { element: { type: "shared-api" } } } },
         { from: { element: { type: "shared-ui" } }, allow: { to: { element: { type: "shared-ui" } } } },
         { from: { element: { type: "shared-map" } }, allow: { to: { element: { type: "shared-map" } } } },
+        { from: { element: { type: "shared-session" } }, allow: { to: { element: { types: { anyOf: ["shared-session", "shared-api", "shared-ui"] } } } } },
         // Third-party packages are fine everywhere (database drivers are banned below).
         { allow: { to: { module: { origin: "external" } } } },
         { allow: { to: { module: { origin: "core" } } } },

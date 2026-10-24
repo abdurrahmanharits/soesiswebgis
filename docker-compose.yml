@@ -68,6 +68,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Reachable from the host for the backend run with `uv` outside Docker (localhost only).
+    ports:
+      - "127.0.0.1:6379:6379"
     restart: unless-stopped
 
     command:
@@ -108,6 +111,10 @@ services:
       - "--port=8001"
       - "--reload"
       - "--reload-dir=/app/src"
+      # Only the Next.js proxy reaches this port (bound to 127.0.0.1): trust its X-Forwarded-For
+      # so login throttling sees the browser IP.
+      - "--proxy-headers"
+      - "--forwarded-allow-ips=*"
     volumes:
       - ./backend:/app
       - ./contracts:/contracts

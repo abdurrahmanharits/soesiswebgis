@@ -1,12 +1,22 @@
 """Uniform JSON error bodies: {"message": ...} plus "errors" for validation failures.
 
 Same shape as the Laravel API, so the frontend handles both identically.
+Application errors (soesis.shared.kernel) are mapped to status codes only here.
 """
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from soesis.shared.kernel import (
+    ApplicationError,
+    Forbidden,
+    NotFound,
+    TooManyRequests,
+    Unauthenticated,
+    ValidationFailed,
+)
 
 
 def _validation_errors(exc: RequestValidationError) -> dict[str, list[str]]:
@@ -16,6 +26,22 @@ def _validation_errors(exc: RequestValidationError) -> dict[str, list[str]]:
         location = [str(part) for part in error.get("loc", ())[1:]] or ["request"]
         errors.setdefault(".".join(location), []).append(error.get("msg", "Invalid value."))
     return errors
+
+
+def application_error_response(exc: ApplicationError) -> JSONResponse:
+    if isinstance(exc, ValidationFailed):
+        return JSONResponse({"message": exc.message, "errors": exc.errors}, status_code=422)
+    if isinstance(exc, TooManyRequests):
+        return JSONResponse({"message": exc.message}, status_code=429, headers={"Retry-After": str(exc.retry_after)})
+
+    status = 400
+    if isinstance(exc, Unauthenticated):
+        status = 401
+    elif isinstance(exc, Forbidden):
+        status = 403
+    elif isinstance(exc, NotFound):
+        status = 404
+    return JSONResponse({"message": exc.message}, status_code=status)
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -30,3 +56,7 @@ def register_error_handlers(app: FastAPI) -> None:
             {"message": "The given data was invalid.", "errors": _validation_errors(exc)},
             status_code=422,
         )
+
+    @app.exception_handler(ApplicationError)
+    async def application_error(_: Request, exc: ApplicationError) -> JSONResponse:
+        return application_error_response(exc)

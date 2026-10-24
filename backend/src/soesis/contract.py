@@ -14,7 +14,12 @@ from soesis.main import create_app
 from soesis.shared.config import Settings
 
 # Building the app never connects to anything, so a placeholder URL is enough.
-_OFFLINE = Settings(database_url="postgresql+psycopg://contract@localhost/contract", redis_url="redis://localhost:1/0")
+_OFFLINE = Settings(
+    database_url="postgresql+psycopg://contract@localhost/contract",
+    redis_url="redis://localhost:1/0",
+    rate_limit_redis_url="redis://localhost:1/0",
+    jwt_secret="offline-contract-export-only-not-a-real-secret",
+)
 
 
 def render() -> str:

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { requireAccounts, signIn } from "./helpers";
+
 test.describe("R0 foundation", () => {
   test("public landing renders in Indonesian", async ({ page }) => {
     await page.goto("/");
@@ -10,20 +12,21 @@ test.describe("R0 foundation", () => {
   });
 
   test("status page shows backend readiness rendered server-side", async ({ page }) => {
-    await page.goto("/status");
+    requireAccounts();
+    await signIn(page, "curator");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    const readiness = page.getByTestId("readiness");
-    await expect(readiness).toHaveAttribute("data-status", "ok");
+    await expect(page.getByTestId("readiness")).toHaveAttribute("data-status", "ok");
     await expect(page.getByTestId("component-database")).toContainText("postgis: 3.4");
     await expect(page.getByTestId("component-redis")).toContainText("OK");
   });
 
   test("browser reaches FastAPI through the same-origin /api proxy", async ({ page }) => {
+    requireAccounts();
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
 
-    await page.goto("/status");
+    await signIn(page, "curator");
 
     await expect(page.getByTestId("live-indicator")).toHaveAttribute("data-state", "up");
     expect(errors).toEqual([]);
